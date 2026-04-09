@@ -1,0 +1,367 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model auditlog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  details   String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([userId], map: "AuditLog_userId_fkey")
+  @@index([action], map: "AuditLog_action_idx")
+  @@index([createdAt], map: "AuditLog_createdAt_idx")
+}
+
+model attribute {
+  id   String @id @default(uuid())
+  name String @unique
+}
+
+model cart {
+  id       String @id @default(uuid())
+  userId   String
+  paintId  String
+  quantity Int    @default(1)
+
+  @@index([paintId], map: "Cart_paintId_fkey")
+  @@index([userId], map: "Cart_userId_fkey")
+}
+
+model category {
+  id          String  @id @default(uuid())
+  name        String  @unique(map: "Category_name_key")
+  description String?
+  /// عرض اختياري يطبّق على كل منتجات القسم (للعرض والمنطق في الواجهة)
+  offerId     String?
+  offer       offer?  @relation(fields: [offerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+}
+
+model chatmessage {
+  id        String   @id @default(uuid())
+  userId    String
+  message   String
+  response  String
+  createdAt DateTime @default(now())
+
+  @@index([userId], map: "ChatMessage_userId_fkey")
+}
+
+model designerprofile {
+  id          String  @id @default(uuid())
+  userId      String  @unique(map: "DesignerProfile_userId_key")
+  experience  Int?
+  specialties String?
+  rating      Float?
+  portfolio   String?
+  bio         String? @db.Text
+  location    String?
+}
+
+model design {
+  id          String   @id @default(uuid())
+  designerId  String
+  title       String
+  description String   @db.Text
+  imageUrl    String
+  videoUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([designerId], map: "Design_designerId_fkey")
+  @@map("design")
+}
+
+model designcomment {
+  id        String   @id @default(uuid())
+  designId  String
+  userId    String
+  text      String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([designId], map: "DesignComment_designId_fkey")
+  @@index([userId], map: "DesignComment_userId_fkey")
+  @@map("design_comment")
+}
+
+model designfavorite {
+  userId   String
+  designId String
+
+  @@id([userId, designId])
+  @@index([designId], map: "DesignFavorite_designId_fkey")
+  @@map("design_favorite")
+}
+
+model designrequest {
+  id           String   @id @default(uuid())
+  designId     String
+  clientUserId String
+  description  String   @db.Text
+  imageUrl     String?
+  videoUrl     String?
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+
+  @@index([designId], map: "DesignRequest_designId_fkey")
+  @@index([clientUserId], map: "DesignRequest_clientUserId_fkey")
+  @@map("design_request")
+}
+
+model favoritecolor {
+  id        String  @id @default(uuid())
+  userId    String
+  colorCode String
+  name      String?
+
+  @@index([userId], map: "FavoriteColor_userId_fkey")
+}
+
+model favoriteproduct {
+  userId  String
+  paintId String
+
+  @@id([userId, paintId])
+  @@index([paintId], map: "FavoriteProduct_paintId_fkey")
+}
+
+model offer {
+  id           String             @id @default(uuid())
+  title        String             @unique
+  discount     Float
+  isActive     Boolean            @default(true)
+  startDate    DateTime
+  endDate      DateTime
+  discountType offer_discountType
+  categories   category[]
+}
+
+model order {
+  id             String                @id @default(uuid())
+  userId         String
+  painterId      String?
+  totalPrice     Float
+  status         String                @default("pending")
+  createdAt      DateTime              @default(now())
+  area           Float?
+  serviceDate    DateTime?
+  serviceTime    String?
+  zone           String?
+  paymentMethod  order_payment_method?
+
+  @@index([painterId], map: "Order_painterId_fkey")
+  @@index([userId], map: "Order_userId_fkey")
+}
+
+model visitrequest {
+  id            String   @id @default(uuid())
+  clientUserId  String
+  painterId     String
+  scheduledDate DateTime
+  scheduledTime String
+  area          Float?
+  region        String?  @db.Text
+  address       String   @db.Text
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+  notes         String?  @db.Text
+
+  @@index([clientUserId], map: "VisitRequest_clientUserId_fkey")
+  @@index([painterId], map: "VisitRequest_painterId_fkey")
+  @@map("visit_request")
+}
+
+model orderitem {
+  id        String  @id @default(uuid())
+  orderId   String
+  paintId   String
+  quantity  Int     @default(1)
+  /// سعر الوحدة المحمّل عند إتمام الشراء (جملة أو تجزئة حسب العميل)
+  unitPrice Float?
+
+  @@index([orderId], map: "OrderItem_orderId_fkey")
+  @@index([paintId], map: "OrderItem_paintId_fkey")
+}
+
+model otp {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+}
+
+model Paint {
+  id          String       @id @default(uuid())
+  name        String
+  price       Float
+  description String?
+
+  categoryId  String
+  /// اختياري: مخزون الإدارة فقط: المنتج لا ينتمي لمورد محدد
+  vendorId    String?
+
+  base        paint_base
+  coatHours   Int
+  coverage    Float
+  dryDays     Int
+  finish      paint_finish
+  unit        paint_unit
+  usage       paint_usage
+
+  image         String?
+  stock         Int
+  inStock       Boolean      @default(true)
+  isActive      Boolean      @default(true)
+  weightKg      Float?       @default(1)
+  wholesalePrice Float?
+  sku           String?  @unique
+
+  offerId     String?
+  type        String
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("paint")
+  @@index([categoryId])
+  @@index([vendorId])
+  @@index([offerId])
+}
+
+model paintattribute {
+  paintId     String
+  attributeId String
+
+  @@id([paintId, attributeId])
+  @@index([attributeId], map: "PaintAttribute_attributeId_fkey")
+}
+
+model painter {
+  id          String  @id @default(uuid())
+  rating      Float   @default(0)
+  experience  Int
+  address     String?
+  city        String
+  serviceType String
+  userId      String  @unique(map: "Painter_userId_key")
+  bio         String? @db.Text
+}
+
+model paintergallery {
+  id        String @id @default(uuid())
+  painterId String
+  imageUrl  String
+
+  @@index([painterId], map: "PainterGallery_painterId_fkey")
+}
+
+model painterreview {
+  id        String   @id @default(uuid())
+  painterId String
+  userId    String
+  review    String
+  rating    Float
+  createdAt DateTime @default(now())
+
+  @@index([painterId], map: "PainterReview_painterId_fkey")
+  @@index([userId], map: "PainterReview_userId_fkey")
+}
+
+model selection {
+  id                  String   @id @default(uuid())
+  userId              String
+  paintId             String
+  createdAt           DateTime @default(now())
+  area                Float
+  height              Float?
+  length              Float?
+  recommendedQuantity Int
+  width               Float?
+  colorCode           String?
+  imagePath           String?
+
+  @@index([paintId], map: "Selection_paintId_fkey")
+  @@index([userId], map: "Selection_userId_fkey")
+}
+
+model user {
+  id        String    @id @default(uuid())
+  name      String
+  email     String    @unique(map: "User_email_key")
+  password  String
+  phone     String    @unique(map: "User_phone_key")
+  role      user_role @default(user)
+  avatarUrl String?   @db.VarChar(512)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+}
+
+model usercategory {
+  id         String @id @default(uuid())
+  userId     String
+  categoryId String
+
+  @@unique([userId, categoryId], map: "UserCategory_userId_categoryId_key")
+  @@index([categoryId], map: "UserCategory_categoryId_fkey")
+}
+
+model vendor {
+  id              String  @id @default(uuid())
+  userId          String  @unique(map: "Vendor_userId_key")
+  shopName        String
+  city            String
+  address         String?
+  region          String?
+  taxRegistration String?
+  isApproved      Boolean @default(true)
+  paymentStatus   Boolean @default(false)
+}
+
+enum user_role {
+  user
+  admin
+  painter
+  vendor
+  designer
+}
+
+enum offer_discountType {
+  percentage
+  fixed
+}
+
+enum paint_base {
+  water
+  oil
+  wood
+}
+
+enum paint_finish {
+  matte
+  semi_gloss
+  gloss
+}
+
+enum paint_unit {
+  liter
+  kg
+}
+
+enum paint_usage {
+  indoor
+  outdoor
+  both
+}
+
+enum order_payment_method {
+  visa
+  mastercard
+  apple_pay
+}
