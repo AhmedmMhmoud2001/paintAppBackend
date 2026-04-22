@@ -30,12 +30,12 @@ export const handleAuthRoutes = async (req, res, pathnameOpt) => {
       req.on("error", reject);
     });
 
-  if ((path === "/signup" || path === "/api/signup") && req.method === "POST") {
+  if (path === "/signup" && req.method === "POST") {
     const body = await readJsonBody();
     return signup(req, res, body);
   }
 
-  if ((path === "/login" || path === "/api/login") && req.method === "POST") {
+  if (path === "/login" && req.method === "POST") {
     const body = await readJsonBody();
     return login(req, res, body).catch((err) => {
       if (!res.headersSent) {
@@ -46,7 +46,7 @@ export const handleAuthRoutes = async (req, res, pathnameOpt) => {
   }
 
   if (
-    (path === "/auth/forgot-password/otp" || path === "/api/auth/forgot-password/otp") &&
+    path === "/auth/forgot-password/otp" &&
     req.method === "POST"
   ) {
     const body = await readJsonBody();
@@ -54,7 +54,7 @@ export const handleAuthRoutes = async (req, res, pathnameOpt) => {
   }
 
   if (
-    (path === "/auth/forgot-password/verify-otp" || path === "/api/auth/forgot-password/verify-otp") &&
+    path === "/auth/forgot-password/verify-otp" &&
     req.method === "POST"
   ) {
     const body = await readJsonBody();
@@ -62,7 +62,7 @@ export const handleAuthRoutes = async (req, res, pathnameOpt) => {
   }
 
   if (
-    (path === "/auth/forgot-password/reset" || path === "/api/auth/forgot-password/reset") &&
+    path === "/auth/forgot-password/reset" &&
     req.method === "POST"
   ) {
     const body = await readJsonBody();

@@ -3557,7 +3557,7 @@ export const getPaymentMethods = async (req, res) => {
  * /checkout:
  *   post:
  *     tags: [Cart]
- *     summary: إتمام الشراء من السلة وإنشاء طلب
+ *     summary: إنشاء أوردر للعميل (Checkout من السلة)
  *     description: >-
  *       المسار الفعلي يدعم أيضاً `/api/checkout`.
  *       فلو الطلب الكامل: GET /payment-methods -> POST /cart/items -> GET /cart -> POST /checkout -> GET /orders -> GET /orders/{id}.
@@ -3784,7 +3784,7 @@ export const checkoutCart = async (req, res) => {
  * @swagger
  * /painters:
  *   get:
- *     tags: [Painters]
+ *     tags: [Painters request]
  *     summary: قائمة الفنيين مع user ومعرض الصور gallery
  *     description: "العميل يفلتر بنوع الخدمة والعنوان. مثال: GET /painters?serviceType=interior&address=Riyadh"
  *     security: []
@@ -3833,8 +3833,11 @@ export const checkoutCart = async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/PainterWithGallery'
  *       401:
+ *         description: Missing/invalid token
  *       403:
+ *         description: Painters only
  *       404:
+ *         description: Painter profile not found
  *   put:
  *     tags: [Painters]
  *     summary: تحديث بروفايل الفني الحالي (اسم/بريد/هاتف + بيانات الفني)
@@ -3876,8 +3879,11 @@ export const checkoutCart = async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/PainterGalleryItem'
  *       400:
+ *         description: Invalid image upload
  *       401:
+ *         description: Missing/invalid token
  *       403:
+ *         description: Painters only
  * /painters/me/gallery/{galleryId}:
  *   delete:
  *     tags: [Painters]
@@ -3897,6 +3903,7 @@ export const checkoutCart = async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/MessageOk'
  *       404:
+ *         description: Gallery item not found
  * /painters/gallery/{galleryId}:
  *   delete:
  *     tags: [Painters]
@@ -3916,11 +3923,14 @@ export const checkoutCart = async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/MessageOk'
  *       403:
+ *         description: Not allowed
  *       404:
+ *         description: Gallery item not found
  * /painters/{id}:
  *   get:
- *     tags: [Painters]
- *     summary: فني بالمعرف مع gallery
+ *     tags: [Painters request]
+ *     summary: كل بيانات الفني بالصور (gallery) للمستخدم
+ *     description: يرجع بيانات الفني + user + gallery + آخر 5 reviews مع بيانات العميل.
  *     security: []
  *     parameters:
  *       - in: path
@@ -3935,6 +3945,7 @@ export const checkoutCart = async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/PainterWithGallery'
  *       404:
+ *         description: Painter not found
  *   put:
  *     tags: [Painters]
  *     summary: تحديث فني (الفني نفسه أو المشرف)
@@ -3999,9 +4010,74 @@ const attachAveragePainterRatings = async (painters) => {
   );
   return (painters || []).map((p) => ({
     ...p,
-    rating: avgMap[p.id] != null ? Number(avgMap[p.id].toFixed(1)) : null,
+    rating:
+      avgMap[p.id] != null
+        ? Number(avgMap[p.id].toFixed(1))
+        : p?.rating != null
+          ? Number(p.rating)
+          : 0,
   }));
 };
+
+// ===== Painter gallery likes =====
+async function ensurePainterGalleryLikesTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS \`painter_gallery_like\` (
+      \`id\` VARCHAR(36) NOT NULL,
+      \`galleryId\` VARCHAR(36) NOT NULL,
+      \`userId\` VARCHAR(36) NOT NULL,
+      \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      PRIMARY KEY (\`id\`),
+      UNIQUE KEY \`PainterGalleryLike_galleryId_userId_key\` (\`galleryId\`, \`userId\`),
+      INDEX \`PainterGalleryLike_galleryId_idx\` (\`galleryId\`),
+      INDEX \`PainterGalleryLike_userId_idx\` (\`userId\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  `);
+}
+
+function authenticateOptional(req) {
+  try {
+    return authenticate(req);
+  } catch {
+    return null;
+  }
+}
+
+async function attachLikeInfoToGallery(galleryItems, viewerUserId) {
+  const list = Array.isArray(galleryItems) ? galleryItems : [];
+  const ids = [...new Set(list.map((g) => g?.id).filter(Boolean))];
+  if (ids.length === 0) return list.map((g) => ({ ...g, likesCount: 0, isLiked: false }));
+
+  await ensurePainterGalleryLikesTable();
+
+  const counts = await prisma.$queryRawUnsafe(
+    `SELECT galleryId, COUNT(*) AS likesCount FROM painter_gallery_like WHERE galleryId IN (${ids
+      .map(() => "?")
+      .join(",")}) GROUP BY galleryId`,
+    ...ids,
+  );
+  const countMap = Object.fromEntries(
+    (Array.isArray(counts) ? counts : []).map((r) => [r.galleryId, Number(r.likesCount) || 0]),
+  );
+
+  let likedSet = new Set();
+  if (viewerUserId) {
+    const likedRows = await prisma.$queryRawUnsafe(
+      `SELECT galleryId FROM painter_gallery_like WHERE userId = ? AND galleryId IN (${ids
+        .map(() => "?")
+        .join(",")})`,
+      viewerUserId,
+      ...ids,
+    );
+    likedSet = new Set((Array.isArray(likedRows) ? likedRows : []).map((r) => r.galleryId));
+  }
+
+  return list.map((g) => ({
+    ...g,
+    likesCount: countMap[g.id] || 0,
+    isLiked: viewerUserId ? likedSet.has(g.id) : false,
+  }));
+}
 
 export const getPainters = async (req, res) => {
   try {
@@ -4036,7 +4112,9 @@ export const getPainters = async (req, res) => {
             where: { painterId: { in: painterIds } },
             orderBy: { id: "desc" },
           });
-    const withGallery = attachGalleriesToPainters(painters, galleries);
+    const viewer = authenticateOptional(req);
+    const galleryWithLikes = await attachLikeInfoToGallery(galleries, viewer?.id);
+    const withGallery = attachGalleriesToPainters(painters, galleryWithLikes);
     const withAvgRating = await attachAveragePainterRatings(withGallery);
     const withUser = withAvgRating.map((p) => ({
       ...p,
@@ -4059,14 +4137,156 @@ export const getPainterById = async (req, res, id) => {
       where: { painterId: painter.id },
       orderBy: { id: "desc" },
     });
+    const viewer = authenticateOptional(req);
+    const galleryWithLikes = await attachLikeInfoToGallery(gallery, viewer?.id);
+    const latestReviews = await prisma.painterreview.findMany({
+      where: { painterId: painter.id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    });
+    const reviewerIds = [...new Set(latestReviews.map((r) => r.userId).filter(Boolean))];
+    const reviewers =
+      reviewerIds.length === 0
+        ? []
+        : await prisma.user.findMany({
+            where: { id: { in: reviewerIds } },
+            select: { id: true, name: true, phone: true, avatarUrl: true },
+          });
+    const reviewerMap = Object.fromEntries(reviewers.map((u) => [u.id, u]));
+    const reviews = latestReviews.map((r) => ({
+      id: r.id,
+      painterId: r.painterId,
+      review: r.review,
+      rating: r.rating,
+      createdAt: r.createdAt,
+      user: reviewerMap[r.userId] || null,
+    }));
     const withAvg = (await attachAveragePainterRatings([painter]))[0] || painter;
     json(res, 200, {
       ...withAvg,
       user: user ? withoutPassword(user) : null,
-      gallery,
+      gallery: galleryWithLikes,
+      reviews,
     });
   } catch (err) {
     json(res, 500, { error: err.message });
+  }
+};
+
+/**
+ * @swagger
+ * /painters/gallery/{galleryId}/like:
+ *   get:
+ *     tags: [Painters request]
+ *     summary: حالة الإعجاب لصورة معرض الفني + عدد الإعجابات
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: galleryId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Like status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 galleryId: { type: string }
+ *                 likesCount: { type: integer }
+ *                 isLiked: { type: boolean }
+ *       401:
+ *         description: Missing/invalid token
+ *   post:
+ *     tags: [Painters request]
+ *     summary: تبديل الإعجاب (Like/Unlike) لصورة معرض الفني
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: galleryId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Toggled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 galleryId: { type: string }
+ *                 likesCount: { type: integer }
+ *                 isLiked: { type: boolean }
+ *       401:
+ *         description: Missing/invalid token
+ */
+export const getPainterGalleryLikeStatus = async (req, res, galleryId) => {
+  try {
+    const user = authenticate(req);
+    const gid = String(galleryId || "").trim();
+    if (!gid) return json(res, 400, { error: "Invalid galleryId" });
+
+    await ensurePainterGalleryLikesTable();
+    const [countRow] = await prisma.$queryRawUnsafe(
+      "SELECT COUNT(*) AS likesCount FROM painter_gallery_like WHERE galleryId = ?",
+      gid,
+    );
+    const likesCount = Number(countRow?.likesCount) || 0;
+    const liked = await prisma.$queryRawUnsafe(
+      "SELECT id FROM painter_gallery_like WHERE galleryId = ? AND userId = ? LIMIT 1",
+      gid,
+      user.id,
+    );
+    const isLiked = Array.isArray(liked) ? Boolean(liked[0]) : Boolean(liked);
+    json(res, 200, { galleryId: gid, likesCount, isLiked });
+  } catch (err) {
+    const msg = err.message || "Unauthorized";
+    const code = msg.includes("token") || msg === "No token provided" ? 401 : 500;
+    json(res, code, { error: msg });
+  }
+};
+
+export const togglePainterGalleryLike = async (req, res, galleryId) => {
+  try {
+    const user = authenticate(req);
+    const gid = String(galleryId || "").trim();
+    if (!gid) return json(res, 400, { error: "Invalid galleryId" });
+
+    await ensurePainterGalleryLikesTable();
+    const existing = await prisma.$queryRawUnsafe(
+      "SELECT id FROM painter_gallery_like WHERE galleryId = ? AND userId = ? LIMIT 1",
+      gid,
+      user.id,
+    );
+    const has = Array.isArray(existing) ? Boolean(existing[0]) : Boolean(existing);
+    if (has) {
+      await prisma.$executeRawUnsafe(
+        "DELETE FROM painter_gallery_like WHERE galleryId = ? AND userId = ?",
+        gid,
+        user.id,
+      );
+    } else {
+      const id = randomUUID();
+      await prisma.$executeRawUnsafe(
+        "INSERT INTO painter_gallery_like (id, galleryId, userId) VALUES (?, ?, ?)",
+        id,
+        gid,
+        user.id,
+      );
+    }
+    const [countRow] = await prisma.$queryRawUnsafe(
+      "SELECT COUNT(*) AS likesCount FROM painter_gallery_like WHERE galleryId = ?",
+      gid,
+    );
+    const likesCount = Number(countRow?.likesCount) || 0;
+    json(res, 200, { galleryId: gid, likesCount, isLiked: !has });
+  } catch (err) {
+    const msg = err.message || "Unauthorized";
+    const code = msg.includes("token") || msg === "No token provided" ? 401 : 500;
+    json(res, code, { error: msg });
   }
 };
 
@@ -4347,7 +4567,7 @@ export const getPainterFinancial = async (req, res, id) => {
  *               items:
  *                 type: object
  *   post:
- *     tags: [Painters]
+ *     tags: [Painters request]
  *     summary: إضافة تقييم (JWT مستخدم)
  *     security:
  *       - bearerAuth: []
@@ -4998,5 +5218,131 @@ export const deleteAdminSimulation = async (req, res, id) => {
     json(res, 200, { message: "Simulation deleted" });
   } catch (err) {
     json(res, 500, { error: err.message });
+  }
+};
+
+// ========== Banners (لوحة التحكم) ==========
+async function ensureBannersTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS \`banner\` (
+      \`id\` VARCHAR(36) NOT NULL,
+      \`imageUrl\` VARCHAR(512) NOT NULL,
+      \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      PRIMARY KEY (\`id\`)
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  `);
+}
+
+/**
+ * @swagger
+ * /banners:
+ *   get:
+ *     tags: [Dashboard]
+ *     summary: قائمة البنرات (صور فقط)
+ *     description: تُستخدم في واجهة المستخدم/الموبايل لعرض صور البنر.
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: مصفوفة صور البنر
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: string }
+ *                   imageUrl: { type: string }
+ *                   createdAt: { type: string, format: date-time }
+ * /api/banners:
+ *   get:
+ *     tags: [Dashboard]
+ *     summary: قائمة البنرات (بادئة /api)
+ *     description: نفس GET `/banners`.
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: مصفوفة صور البنر
+ */
+export const getBanners = async (req, res) => {
+  try {
+    await ensureBannersTable();
+    const rows = await prisma.$queryRawUnsafe(
+      "SELECT id, imageUrl, createdAt FROM `banner` ORDER BY createdAt DESC",
+    );
+    json(res, 200, Array.isArray(rows) ? rows : []);
+  } catch (err) {
+    json(res, 500, { error: err.message || "Failed to load banners" });
+  }
+};
+
+/**
+ * @swagger
+ * /admin/banners:
+ *   post:
+ *     tags: [Dashboard]
+ *     summary: إضافة بنر (admin) — رفع صورة فقط
+ *     description: "Multipart upload (field name: image). يعيد مسار الصورة في uploads."
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [image]
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       201:
+ *         description: تم إضافة البنر
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: string }
+ *                 imageUrl: { type: string }
+ *                 createdAt: { type: string, format: date-time }
+ *       400:
+ *         description: No file uploaded
+ *       401:
+ *         description: Missing/invalid token
+ *       403:
+ *         description: Admins only
+ */
+export const createBanner = async (req, res) => {
+  try {
+    const jwtUser = authenticate(req);
+    if (jwtUser.role !== "admin") return json(res, 403, { error: "Admins only" });
+
+    if (!req.file) return json(res, 400, { error: "No file uploaded" });
+    if (!ALLOWED_AVATAR_TYPES.has(req.file.mimetype)) {
+      fs.unlink(req.file.path, () => {});
+      return json(res, 400, { error: "Only JPEG, PNG, GIF or WebP images are allowed" });
+    }
+
+    await ensureBannersTable();
+    const id = randomUUID();
+    const imageUrl = `/uploads/${req.file.filename}`;
+    await prisma.$executeRawUnsafe(
+      "INSERT INTO `banner` (`id`,`imageUrl`) VALUES (?, ?)",
+      id,
+      imageUrl,
+    );
+    const rows = await prisma.$queryRawUnsafe(
+      "SELECT id, imageUrl, createdAt FROM `banner` WHERE id = ? LIMIT 1",
+      id,
+    );
+    const banner = Array.isArray(rows) && rows[0] ? rows[0] : { id, imageUrl, createdAt: new Date().toISOString() };
+    json(res, 201, banner);
+  } catch (err) {
+    if (req.file?.path) fs.unlink(req.file.path, () => {});
+    const msg = err.message || "Failed to create banner";
+    const code = msg.includes("token") || msg === "No token provided" ? 401 : 500;
+    json(res, code, { error: msg });
   }
 };

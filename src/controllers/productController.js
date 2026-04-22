@@ -63,25 +63,17 @@ function localizePaintRow(row, preferredLang = "ar") {
  *   get:
  *     tags: [Products]
  *     summary: قائمة جميع المنتجات (الدهانات)
- *     description: يعيد صفوف من جدول paint مع إضافة `minStockLevel` الافتراضي عند الحاجة. يُستخدم أيضاً GET /paint كبديل.
+ *     description: يعيد صفوف من جدول paint مع إضافة `minStockLevel` الافتراضي عند الحاجة.
  *     security: []
+ *     parameters:
+ *       - in: query
+ *         name: categoryId
+ *         description: تصفية المنتجات حسب معرف القسم (UUID)
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: مصفوفة منتجات
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/PaintListItem'
- * /paint:
- *   get:
- *     tags: [Products]
- *     summary: قائمة المنتجات (بديل لـ /paints)
- *     security: []
- *     responses:
- *       200:
- *         description: نفس استجابة GET /paints
  *         content:
  *           application/json:
  *             schema:
@@ -103,30 +95,22 @@ function localizePaintRow(row, preferredLang = "ar") {
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/PaintListItem'
- * /api/paint:
- *   get:
- *     tags: [Products]
- *     summary: قائمة المنتجات (بادئة /api)
- *     description: نفس GET `/paint`.
- *     security: []
- *     responses:
- *       200:
- *         description: مصفوفة منتجات
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/PaintListItem'
  */
 // ===== Get All Paints — لا نُرجع 500 أبداً =====
 export const getAllPaints = async (req, res) => {
   let rows = [];
   try {
     const preferredLang = getPreferredLang(req);
+    const parsed = new URL(req.url, `http://${req.headers.host}`);
+    const categoryId = String(parsed.searchParams.get("categoryId") || "").trim();
     const q = String.fromCharCode(96);
     try {
-      rows = await prisma.$queryRawUnsafe(`SELECT * FROM ${q}paint${q}`);
+      rows = categoryId
+        ? await prisma.$queryRawUnsafe(
+            `SELECT * FROM ${q}paint${q} WHERE ${q}categoryId${q} = ?`,
+            categoryId,
+          )
+        : await prisma.$queryRawUnsafe(`SELECT * FROM ${q}paint${q}`);
     } catch (e) {
       console.warn("[getAllPaints]", e.message);
       rows = [];

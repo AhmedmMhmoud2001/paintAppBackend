@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import url from "url";
 import swaggerUiDist from "swagger-ui-dist";
 import { handleAuthRoutes } from "./routes/authRoutes.js";
-import { swaggerSpec } from "./swaggerConfig.js";
+import { swaggerSpec, swaggerSpecMobile } from "./swaggerConfig.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
@@ -96,6 +96,8 @@ import {
   getPainterReviews,
   createPainterReview,
   deletePainterReview,
+  getPainterGalleryLikeStatus,
+  togglePainterGalleryLike,
   getAdminOrders,
   getAdminOrderById,
   updateAdminOrder,
@@ -104,6 +106,8 @@ import {
   updateAdminVisit,
   getAdminSimulations,
   deleteAdminSimulation,
+  getBanners,
+  createBanner,
 } from "./controllers/dashboardApiController.js";
 import {
   getDesigns,
@@ -201,9 +205,55 @@ const server = http.createServer(async (req, res) => {
   // ===== OpenAPI / Swagger Docs =====
   if ((pathname === "/openapi.json" || pathname === "/api/openapi.json") && method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-    return res.end(JSON.stringify(swaggerSpec));
+    const isMobileSpec = String(parsedUrl.query?.mobile || "") === "1";
+    return res.end(JSON.stringify(isMobileSpec ? swaggerSpecMobile : swaggerSpec));
   }
   if ((pathname === "/api-docs" || pathname === "/api-docs/") && method === "GET") {
+    const ua = String(req.headers["user-agent"] || "").toLowerCase();
+    const isMobileUA = /\b(android|iphone|ipad|ipod|windows phone)\b/i.test(ua);
+    const forceMobileDocs =
+      String(parsedUrl.query?.mobile || "") === "1" ||
+      String(parsedUrl.query?.view || "") === "mobile";
+
+    // On mobile, show a clean page without listing endpoints.
+    // Desktop keeps the Swagger UI.
+    if (isMobileUA && !forceMobileDocs) {
+      const mobileHtml = `<!doctype html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paint App</title>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: #0b1220; color: #e7eefc; }
+    .wrap { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    .card { width: min(520px, 100%); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 20px; }
+    .title { font-size: 20px; font-weight: 700; margin: 0 0 10px; }
+    .muted { margin: 0; opacity: 0.85; line-height: 1.6; }
+    .row { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+    a.btn { text-decoration: none; color: #0b1220; background: #9ae6ff; padding: 10px 12px; border-radius: 12px; font-weight: 700; }
+    code { background: rgba(255,255,255,0.10); padding: 2px 6px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1 class="title">Paint App</h1>
+      <p class="muted">هذه صفحة موبايل بسيطة بدون عرض أي Endpoints.</p>
+      <p class="muted">If you need the API docs, open this page from a desktop browser.</p>
+      <div class="row">
+        <a class="btn" href="/api/ping">Ping</a>
+      </div>
+      <p class="muted" style="margin-top:12px">Tip: على الكمبيوتر افتح <code>/api-docs</code> لعرض Swagger UI.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      return res.end(mobileHtml);
+    }
+
     const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -219,7 +269,7 @@ const server = http.createServer(async (req, res) => {
   <script>
     window.onload = function () {
       window.ui = SwaggerUIBundle({
-        url: "/openapi.json",
+        url: ${forceMobileDocs ? '"/openapi.json?mobile=1"' : '"/openapi.json"'},
         dom_id: "#swagger-ui",
         deepLinking: true,
         presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
@@ -467,6 +517,11 @@ const server = http.createServer(async (req, res) => {
     const parts = pathname.split("/").filter(Boolean);
     const base = parts[0] === "api" ? 1 : 0;
     const galleryId = parts[base + 2];
+    const sub = parts[base + 3];
+    if (sub === "like" && galleryId) {
+      if (method === "GET") return getPainterGalleryLikeStatus(req, res, galleryId);
+      if (method === "POST") return togglePainterGalleryLike(req, res, galleryId);
+    }
     if (method === "DELETE" && galleryId) {
       return deletePainterGalleryImage(req, res, galleryId);
     }
@@ -516,10 +571,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (
-    (pathname === "/paint" ||
-      pathname === "/paints" ||
-      pathname === "/api/paint" ||
-      pathname === "/api/paints") &&
+    (pathname === "/paints" || pathname === "/api/paints") &&
     method === "GET"
   ) {
     return getAllPaints(req, res).catch((err) => {
@@ -747,6 +799,20 @@ const server = http.createServer(async (req, res) => {
   if (pathname.startsWith("/api/admin/simulations/") && method === "DELETE") {
     const id = pathname.split("/").filter(Boolean).pop();
     return deleteAdminSimulation(req, res, id);
+  }
+
+  // ===== Banners (Dashboard) =====
+  if ((pathname === "/banners" || pathname === "/api/banners") && method === "GET") {
+    return getBanners(req, res);
+  }
+  if ((pathname === "/admin/banners" || pathname === "/api/admin/banners") && method === "POST") {
+    try {
+      authorize(req, ["admin"]);
+      return upload.single("image")(req, res, () => createBanner(req, res));
+    } catch (err) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: err.message }));
+    }
   }
 
   // ===== حاسبة الطلاء (Services) =====

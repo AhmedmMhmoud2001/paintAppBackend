@@ -91,29 +91,6 @@ async function buildTokenForUser(user) {
  *         description: User created successfully
  *       400:
  *         description: Missing fields or user already exists
- * /api/signup:
- *   post:
- *     summary: Register a new user (API prefix)
- *     description: نفس POST `/signup`
- *     tags: [Auth]
- *     security: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [name, email, phone, password]
- *             properties:
- *               name: { type: string }
- *               email: { type: string }
- *               phone: { type: string }
- *               password: { type: string }
- *     responses:
- *       201:
- *         description: User created successfully
- *       400:
- *         description: Missing fields or user already exists
  */
 export const signup = async (req, res, body) => {
   try {
@@ -249,33 +226,6 @@ export const signup = async (req, res, body) => {
  *         description: Invalid password
  *       404:
  *         description: User not found
- * /api/login:
- *   post:
- *     summary: Login a user (API prefix)
- *     description: نفس POST `/login`
- *     tags: [Auth]
- *     security: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [phone, password]
- *             properties:
- *               phone:
- *                 type: string
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Login successful
- *       401:
- *         description: Invalid password
- *       404:
- *         description: User not found
  */
 export const login = async (req, res, body) => {
   try {
@@ -391,12 +341,6 @@ const makeOtpCode = () => String(Math.floor(100000 + Math.random() * 900000));
  *         description: OTP generated successfully
  *       404:
  *         description: User not found
- * /api/auth/forgot-password/otp:
- *   post:
- *     summary: Request password reset OTP (API prefix)
- *     description: نفس POST `/auth/forgot-password/otp`
- *     tags: [Auth]
- *     security: []
  */
 export const requestPasswordResetOtp = async (req, res, body) => {
   try {
@@ -468,12 +412,6 @@ export const requestPasswordResetOtp = async (req, res, body) => {
  *         description: OTP is valid
  *       400:
  *         description: OTP invalid/expired
- * /api/auth/forgot-password/verify-otp:
- *   post:
- *     summary: Verify password reset OTP (API prefix)
- *     description: نفس POST `/auth/forgot-password/verify-otp`
- *     tags: [Auth]
- *     security: []
  */
 export const verifyPasswordResetOtp = async (req, res, body) => {
   try {
@@ -534,12 +472,6 @@ export const verifyPasswordResetOtp = async (req, res, body) => {
  *         description: Password reset successful
  *       400:
  *         description: Validation/OTP failure
- * /api/auth/forgot-password/reset:
- *   post:
- *     summary: Reset password using OTP (API prefix)
- *     description: نفس POST `/auth/forgot-password/reset`
- *     tags: [Auth]
- *     security: []
  */
 export const resetPasswordWithOtp = async (req, res, body) => {
   try {

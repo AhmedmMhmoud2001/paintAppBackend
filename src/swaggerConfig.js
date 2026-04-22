@@ -24,7 +24,6 @@ const options = {
     ],
     tags: [
       { name: "Auth", description: "تسجيل الدخول والتسجيل" },
-      { name: "Users", description: "المستخدمون، الحساب الحالي، صورة البروفايل" },
       { name: "Designers", description: "المصممون وبروفايل المصمم" },
       {
         name: "Designs",
@@ -32,6 +31,7 @@ const options = {
           "التصاميم (قائمة، تفاصيل)، طلب تنفيذ على تصميم، تعليقات، مفضلة، رابط مشاركة",
       },
       { name: "Painters", description: "فنيو الدهان، البروفايل، معرض أعمال التنفيذ" },
+      { name: "Painters request", description: "طلبات الموبايل: قائمة الفنيين وتفاصيل فني بالصور" },
       { name: "VisitRequests", description: "طلبات زيارة الفني (موعد، عنوان، منطقة)" },
       { name: "Cart", description: "سلة المشتريات وإتمام الطلب" },
       {
@@ -43,6 +43,7 @@ const options = {
         description: "طلبات المستخدم الحالي وعرض فاتورة/تفاصيل كل طلب (يتطلب تسجيل الدخول)",
       },
       { name: "Vendor Requests", description: "طلبات الجملة، التحول إلى تاجر، والموافقة من لوحة الإدارة" },
+      { name: "Dashboard", description: "لوحة التحكم (بنرات، وغيرها)" },
     ],
     components: {
       securitySchemes: {
@@ -1017,4 +1018,164 @@ const options = {
   apis: ["./src/server.js", "./src/routes/*.js", "./src/controllers/*.js"], // include paths to files containing documentation
 };
 
-export const swaggerSpec = swaggerJSDoc(options);
+function removeTagFromSpec(spec, tagName) {
+  if (!spec || typeof spec !== "object") return spec;
+
+  // Remove top-level tag description (optional but nice)
+  if (Array.isArray(spec.tags)) {
+    spec.tags = spec.tags.filter((t) => t?.name !== tagName);
+  }
+
+  // Remove any operations that use this tag
+  const paths = spec.paths && typeof spec.paths === "object" ? spec.paths : null;
+  if (!paths) return spec;
+
+  for (const [p, pathItem] of Object.entries(paths)) {
+    if (!pathItem || typeof pathItem !== "object") continue;
+
+    for (const [method, op] of Object.entries(pathItem)) {
+      // skip non-operations like parameters
+      if (!op || typeof op !== "object") continue;
+      const m = String(method).toLowerCase();
+      if (!["get", "post", "put", "patch", "delete", "options", "head"].includes(m)) continue;
+
+      const tags = Array.isArray(op.tags) ? op.tags : [];
+      if (tags.includes(tagName)) {
+        delete pathItem[method];
+      }
+    }
+
+    // If the path has no operations left, remove it
+    const remainingOps = Object.keys(pathItem).some((k) =>
+      ["get", "post", "put", "patch", "delete", "options", "head"].includes(String(k).toLowerCase()),
+    );
+    if (!remainingOps) {
+      delete paths[p];
+    }
+  }
+
+  return spec;
+}
+
+function sanitizeResponses(spec) {
+  const paths = spec?.paths && typeof spec.paths === "object" ? spec.paths : null;
+  if (!paths) return spec;
+
+  for (const pathItem of Object.values(paths)) {
+    if (!pathItem || typeof pathItem !== "object") continue;
+
+    for (const [method, op] of Object.entries(pathItem)) {
+      const m = String(method).toLowerCase();
+      if (!["get", "post", "put", "patch", "delete", "options", "head"].includes(m)) continue;
+      if (!op || typeof op !== "object") continue;
+
+      const responses = op.responses && typeof op.responses === "object" ? op.responses : null;
+      if (!responses) continue;
+
+      for (const [code, resp] of Object.entries(responses)) {
+        if (resp === null) {
+          responses[code] = { description: "Response" };
+          continue;
+        }
+        if (resp && typeof resp === "object") {
+          if (typeof resp.description !== "string" || !resp.description.trim()) {
+            resp.description = "Response";
+          }
+        }
+      }
+    }
+  }
+  return spec;
+}
+
+function filterSpecToMobile(spec) {
+  // Mobile clients only need: auth + list products + product details.
+  // Keep only these operations.
+  const allowed = {
+    "/paints": ["get"],
+    "/paint/{id}": ["get"],
+    "/signup": ["post"],
+    "/login": ["post"],
+    "/auth/forgot-password/otp": ["post"],
+    "/auth/forgot-password/verify-otp": ["post"],
+    "/auth/forgot-password/reset": ["post"],
+    "/painters": ["get"],
+    "/painters/{id}": ["get"],
+    "/painter-reviews": ["post"],
+    "/painters/gallery/{galleryId}/like": ["get", "post"],
+    "/visit-requests": ["get", "post"],
+    "/visit-requests/{id}": ["get"],
+    "/painters/me": ["get", "put"],
+    "/painters/me/gallery": ["post"],
+    "/painters/me/gallery/{galleryId}": ["delete"],
+    "/cart": ["get"],
+    "/cart/items": ["post"],
+    "/cart/items/{itemId}": ["patch", "delete"],
+    "/cart/quote": ["post"],
+    "/checkout": ["post"],
+    "/categories": ["get"],
+    "/offers": ["get"],
+    "/coupons": ["get"],
+    "/banners": ["get"],
+    "/orders": ["get"],
+    "/orders/{id}": ["get"],
+    "/api/invoices": ["get"],
+    "/vendor-requests": ["get", "post"],
+    "/wholesale-requests": ["post"],
+    "/vendors/approve/{vendorId}": ["put"],
+    // Designers (mobile user/designer)
+    "/designers": ["get"],
+    "/designers/me": ["get", "put"],
+    "/designers/{userId}": ["get"],
+
+    // Designs (mobile user/designer)
+    "/designs": ["get", "post"],
+    "/designs/{id}": ["get", "put", "delete"],
+    "/designs/{id}/comments": ["get", "post"],
+    "/designs/{id}/comments/{commentId}": ["delete"],
+    "/designs/{id}/favorite": ["get", "post"],
+    "/designs/{id}/requests": ["get", "post"],
+    "/designs/{designId}/requests/{requestId}/status": ["put"],
+    "/designs/{id}/share": ["get"],
+  };
+
+  const next = JSON.parse(JSON.stringify(spec));
+  const paths = next?.paths && typeof next.paths === "object" ? next.paths : {};
+
+  for (const [p, pathItem] of Object.entries(paths)) {
+    const allowedMethods = allowed[p] || null;
+    if (!allowedMethods) {
+      delete paths[p];
+      continue;
+    }
+    for (const method of Object.keys(pathItem || {})) {
+      const m = String(method).toLowerCase();
+      if (!["get", "post", "put", "patch", "delete", "options", "head"].includes(m)) continue;
+      if (!allowedMethods.includes(m)) delete pathItem[method];
+    }
+    const remainingOps = Object.keys(pathItem).some((k) =>
+      ["get", "post", "put", "patch", "delete", "options", "head"].includes(String(k).toLowerCase()),
+    );
+    if (!remainingOps) delete paths[p];
+  }
+
+  // Keep only referenced tags (nice for UI cleanliness)
+  const usedTags = new Set();
+  for (const pathItem of Object.values(paths)) {
+    for (const [method, op] of Object.entries(pathItem || {})) {
+      const m = String(method).toLowerCase();
+      if (!["get", "post", "put", "patch", "delete", "options", "head"].includes(m)) continue;
+      const tags = Array.isArray(op?.tags) ? op.tags : [];
+      for (const t of tags) usedTags.add(t);
+    }
+  }
+  if (Array.isArray(next.tags)) {
+    next.tags = next.tags.filter((t) => usedTags.has(t?.name));
+  }
+
+  return next;
+}
+
+const _full = sanitizeResponses(removeTagFromSpec(swaggerJSDoc(options), "Users"));
+export const swaggerSpec = _full;
+export const swaggerSpecMobile = sanitizeResponses(filterSpecToMobile(_full));
