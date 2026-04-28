@@ -1,0 +1,4722 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Paint App API Documentation",
+    "version": "1.0.0",
+    "description": "API documentation for the Paint Application backend. Includes authentication, products (paints), categories, users, vendors, and more.",
+    "contact": {
+      "name": "Developer"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000",
+      "description": "Local Development Server"
+    },
+    {
+      "url": "https://tovo-b.developteam.site/kids-tovo/api",
+      "description": "Production/Live Server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "تسجيل الدخول والتسجيل"
+    },
+    {
+      "name": "Designers",
+      "description": "المصممون وبروفايل المصمم"
+    },
+    {
+      "name": "Designs",
+      "description": "التصاميم (قائمة، تفاصيل)، طلب تنفيذ على تصميم، تعليقات، مفضلة، رابط مشاركة"
+    },
+    {
+      "name": "Painters",
+      "description": "فنيو الدهان، البروفايل، معرض أعمال التنفيذ"
+    },
+    {
+      "name": "Painters request",
+      "description": "طلبات الموبايل: قائمة الفنيين وتفاصيل فني بالصور"
+    },
+    {
+      "name": "VisitRequests",
+      "description": "طلبات زيارة الفني (موعد، عنوان، منطقة)"
+    },
+    {
+      "name": "Cart",
+      "description": "سلة المشتريات وإتمام الطلب"
+    },
+    {
+      "name": "Orders",
+      "description": "طلبات المستخدم الحالي وعرض فاتورة/تفاصيل كل طلب (يتطلب تسجيل الدخول)"
+    },
+    {
+      "name": "Vendor Requests",
+      "description": "طلبات الجملة، التحول إلى تاجر، والموافقة من لوحة الإدارة"
+    },
+    {
+      "name": "Dashboard",
+      "description": "لوحة التحكم (بنرات، وغيرها)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message (Arabic or English)"
+          }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Category id"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CategoryWithPaintCount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "paints": {
+                "type": "integer",
+                "description": "Number of paints in this category"
+              }
+            }
+          }
+        }
+      },
+      "CategoryCreateBody": {
+        "type": "object",
+        "description": "يفضل إرسال الاسم بالعربي والإنجليزي. يدعم nameAr/nameEn وأيضًا name_ar/name_en للتوافق.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "nameAr": {
+            "type": "string"
+          },
+          "nameEn": {
+            "type": "string"
+          },
+          "name_en": {
+            "type": "string"
+          },
+          "name_ar": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "example": {
+          "nameAr": "دهانات داخلية",
+          "nameEn": "Interior Paints"
+        }
+      },
+      "CategoryUpdateBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "nameAr": {
+            "type": "string"
+          },
+          "nameEn": {
+            "type": "string"
+          },
+          "name_en": {
+            "type": "string"
+          },
+          "name_ar": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CategoryDeleted": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Category deleted"
+          }
+        }
+      },
+      "PaintDetail": {
+        "type": "object",
+        "description": "Normalized paint object returned by GET /paint/{id}",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "number",
+            "description": "May be 0 if missing in DB"
+          },
+          "vendorId": {
+            "type": "number"
+          },
+          "base": {
+            "type": "string",
+            "enum": [
+              "water",
+              "oil",
+              "wood"
+            ]
+          },
+          "coatHours": {
+            "type": "number"
+          },
+          "coverage": {
+            "type": "number"
+          },
+          "dryDays": {
+            "type": "number"
+          },
+          "finish": {
+            "type": "string",
+            "enum": [
+              "matte",
+              "semi_gloss",
+              "gloss"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "liter",
+              "kg"
+            ]
+          },
+          "usage": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "stock": {
+            "type": "number"
+          },
+          "inStock": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "weightKg": {
+            "type": "number"
+          },
+          "offerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "type": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "wholesalePrice": {
+            "type": "number",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "PaintListItem": {
+        "type": "object",
+        "description": "Raw paint row from DB; may include minStockLevel on list endpoint",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "vendorId": {
+            "type": "string"
+          },
+          "base": {
+            "type": "string",
+            "enum": [
+              "water",
+              "oil",
+              "wood"
+            ]
+          },
+          "coatHours": {
+            "type": "integer"
+          },
+          "coverage": {
+            "type": "number"
+          },
+          "dryDays": {
+            "type": "integer"
+          },
+          "finish": {
+            "type": "string",
+            "enum": [
+              "matte",
+              "semi_gloss",
+              "gloss"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "liter",
+              "kg"
+            ]
+          },
+          "usage": {
+            "type": "string",
+            "enum": [
+              "indoor",
+              "outdoor",
+              "both"
+            ]
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "stock": {
+            "type": "integer"
+          },
+          "inStock": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "weightKg": {
+            "type": "number",
+            "nullable": true
+          },
+          "wholesalePrice": {
+            "type": "number",
+            "nullable": true
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          },
+          "offerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "minStockLevel": {
+            "type": "number",
+            "description": "Default 5 when absent in row"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true
+      },
+      "PaintCreateBody": {
+        "type": "object",
+        "required": [
+          "nameAr",
+          "nameEn",
+          "price"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "nameAr": {
+            "type": "string",
+            "description": "اسم المنتج بالعربي (مطلوب)"
+          },
+          "nameEn": {
+            "type": "string",
+            "description": "اسم المنتج بالإنجليزي (مطلوب)"
+          },
+          "type": {
+            "type": "string",
+            "default": "paint"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "descriptionAr": {
+            "type": "string",
+            "nullable": true
+          },
+          "descriptionEn": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "liter",
+              "kg"
+            ],
+            "default": "kg"
+          },
+          "coverage": {
+            "type": "number"
+          },
+          "coatHours": {
+            "type": "number"
+          },
+          "dryDays": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "finish": {
+            "type": "string",
+            "enum": [
+              "matte",
+              "semi_gloss",
+              "gloss"
+            ]
+          },
+          "usage": {
+            "type": "string",
+            "enum": [
+              "indoor",
+              "outdoor",
+              "both"
+            ]
+          },
+          "base": {
+            "type": "string",
+            "enum": [
+              "water",
+              "oil",
+              "wood"
+            ]
+          },
+          "stock": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "UUID of category"
+          },
+          "vendorId": {
+            "type": "string",
+            "nullable": true,
+            "description": "اختياري؛ مخزون الإدارة يُترك فارغًا أو null"
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "offerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "weightKg": {
+            "type": "number",
+            "minimum": 0,
+            "default": 1
+          },
+          "wholesalePrice": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PaintUpdateBody": {
+        "type": "object",
+        "description": "Partial update; at least one field required",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "nameAr": {
+            "type": "string"
+          },
+          "nameEn": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "descriptionAr": {
+            "type": "string",
+            "nullable": true
+          },
+          "descriptionEn": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "vendorId": {
+            "type": "string",
+            "nullable": true,
+            "description": "ارسال null لإزالة الربط بالمورد"
+          },
+          "base": {
+            "type": "string",
+            "enum": [
+              "water",
+              "oil",
+              "wood"
+            ]
+          },
+          "coatHours": {
+            "type": "number"
+          },
+          "coverage": {
+            "type": "number"
+          },
+          "dryDays": {
+            "type": "integer"
+          },
+          "finish": {
+            "type": "string",
+            "enum": [
+              "matte",
+              "semi_gloss",
+              "gloss"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "liter",
+              "kg"
+            ]
+          },
+          "usage": {
+            "type": "string",
+            "enum": [
+              "indoor",
+              "outdoor",
+              "both"
+            ]
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "stock": {
+            "type": "integer"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "offerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "type": {
+            "type": "string"
+          },
+          "weightKg": {
+            "type": "number"
+          },
+          "wholesalePrice": {
+            "type": "number",
+            "nullable": true
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PaintCreateResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Paint created"
+          },
+          "paint": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Last inserted row"
+          }
+        }
+      },
+      "PaintUpdateResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Paint updated"
+          },
+          "paint": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "PaintDeleted": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Paint deleted"
+          }
+        }
+      },
+      "Design": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "designerId": {
+            "type": "string"
+          },
+          "designerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "videoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "DesignCreateBody": {
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "imageUrl"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "videoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "designerId": {
+            "type": "string",
+            "description": "Admin can set owner designerId"
+          }
+        }
+      },
+      "DesignUpdateBody": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "videoUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "DesignCommentBody": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "DesignRequestBody": {
+        "type": "object",
+        "required": [
+          "description"
+        ],
+        "description": "طلب عميل لتنفيذ أو تعديل مرتبط بتصميم معيّن (يُرسل مع POST /designs/{id}/requests).",
+        "properties": {
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "وصف الطلب (إلزامي) — مثال: تفاصيل الألوان، المقاسات، الميزانية"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "رابط صورة مرجعية اختياري"
+          },
+          "videoUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "رابط فيديو مرجعي اختياري"
+          }
+        },
+        "example": {
+          "description": "أرغب بتنفيذ نفس التصميم لغرفة معيشة 4×5 م مع لون جدران أوف وايت.",
+          "imageUrl": "https://example.com/ref.jpg",
+          "videoUrl": null
+        }
+      },
+      "DesignRequestStatusBody": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "description": "تحديث حالة طلب التصميم (المصمم صاحب التصميم أو الأدمن) عبر PUT /designs/{designId}/requests/{requestId}/status.",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected",
+              "completed"
+            ],
+            "description": "الحالة الجديدة للطلب"
+          }
+        },
+        "example": {
+          "status": "accepted"
+        }
+      },
+      "DesignRequest": {
+        "type": "object",
+        "description": "طلب عميل على تصميم. حقلا clientName و clientPhone يُعادان في استجابة GET /designs/{id}/requests لصاحب التصميم أو الأدمن فقط.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "designId": {
+            "type": "string",
+            "description": "معرف التصميم"
+          },
+          "clientUserId": {
+            "type": "string",
+            "description": "معرف المستخدم الذي قدم الطلب"
+          },
+          "clientName": {
+            "type": "string",
+            "nullable": true,
+            "description": "اسم العميل (مُضاف في GET عند جلب الطلبات لصاحب التصميم/الأدمن)"
+          },
+          "clientPhone": {
+            "type": "string",
+            "nullable": true,
+            "description": "جوال العميل (مُضاف في GET عند جلب الطلبات لصاحب التصميم/الأدمن)"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "videoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected",
+              "completed"
+            ],
+            "description": "حالة الطلب؛ الافتراضي عند الإنشاء pending. المصمم يحدّثها عبر PUT .../status."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FavoriteToggleResponse": {
+        "type": "object",
+        "properties": {
+          "favorited": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DesignShareResponse": {
+        "type": "object",
+        "properties": {
+          "designId": {
+            "type": "string"
+          },
+          "shareUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "WholesaleRequestBody": {
+        "type": "object",
+        "description": "طلب تفعيل أسعار الجملة (بدون تغيير الدور إلى تاجر). جميع الحقول التالية إلزامية ما عدا city.",
+        "required": [
+          "userId",
+          "shopName",
+          "taxRegistration",
+          "companyType",
+          "fullName",
+          "email",
+          "phone",
+          "companyAddress"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "معرف المستخدم الحالي"
+          },
+          "shopName": {
+            "type": "string",
+            "description": "اسم الشركة / المحل"
+          },
+          "taxRegistration": {
+            "type": "string",
+            "description": "الرقم الضريبي"
+          },
+          "companyType": {
+            "type": "string",
+            "description": "نوع الشركة (يُخزَّن أيضاً ضمن region كـ type:...)"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "الاسم الكامل لصاحب الطلب"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "description": "رقم الجوال"
+          },
+          "companyAddress": {
+            "type": "string",
+            "description": "عنوان الشركة"
+          },
+          "city": {
+            "type": "string",
+            "nullable": true,
+            "description": "اختياري؛ الافتراضي N/A"
+          }
+        }
+      },
+      "VendorUpgradeRequestBody": {
+        "type": "object",
+        "description": "طلب التحول إلى حساب تاجر. جميع الحقول التالية إلزامية ما عدا city.",
+        "required": [
+          "userId",
+          "shopName",
+          "taxRegistration",
+          "companyType",
+          "fullName",
+          "email",
+          "phone",
+          "companyAddress"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "معرف المستخدم الحالي"
+          },
+          "shopName": {
+            "type": "string",
+            "description": "اسم الشركة / المحل"
+          },
+          "taxRegistration": {
+            "type": "string",
+            "description": "الرقم الضريبي"
+          },
+          "companyType": {
+            "type": "string",
+            "description": "نوع الشركة"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "الاسم الكامل لصاحب الطلب"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "description": "رقم الجوال"
+          },
+          "companyAddress": {
+            "type": "string",
+            "description": "عنوان الشركة"
+          },
+          "city": {
+            "type": "string",
+            "nullable": true,
+            "description": "اختياري؛ الافتراضي N/A"
+          }
+        }
+      },
+      "VendorRequestSubmitResponse": {
+        "type": "object",
+        "description": "استجابة إنشاء أو تحديث طلب (قد لا يتضمن request عند رسالة فقط)",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "request": {
+            "type": "object",
+            "description": "سجل vendor بعد الإنشاء أو التحديث"
+          }
+        }
+      },
+      "ApproveVendorBody": {
+        "type": "object",
+        "properties": {
+          "isApproved": {
+            "type": "boolean",
+            "description": "عند true ونوع الطلب VENDOR يُرقّى المستخدم إلى vendor"
+          },
+          "paymentStatus": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PendingVendorRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "shopName": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "region": {
+            "type": "string",
+            "nullable": true,
+            "description": "يُخزَّن نوع الشركة بصيغة type:{companyType}"
+          },
+          "taxRegistration": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentStatus": {
+            "type": "boolean"
+          },
+          "isApproved": {
+            "type": "boolean"
+          },
+          "requestType": {
+            "type": "string",
+            "enum": [
+              "VENDOR",
+              "WHOLESALE"
+            ],
+            "description": "نوع الطلب: تحويل تاجر أو شراء بالجملة فقط"
+          },
+          "user": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Paint": {
+        "type": "object",
+        "description": "Legacy aggregate schema; prefer PaintDetail / PaintListItem",
+        "required": [
+          "name",
+          "price"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "default": "paint"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "liter",
+              "kg"
+            ]
+          },
+          "coverage": {
+            "type": "number"
+          },
+          "coatHours": {
+            "type": "number"
+          },
+          "dryDays": {
+            "type": "integer"
+          },
+          "finish": {
+            "type": "string",
+            "enum": [
+              "matte",
+              "semi_gloss",
+              "gloss"
+            ]
+          },
+          "usage": {
+            "type": "string",
+            "enum": [
+              "indoor",
+              "outdoor",
+              "both"
+            ]
+          },
+          "base": {
+            "type": "string",
+            "enum": [
+              "water",
+              "oil",
+              "wood"
+            ]
+          },
+          "stock": {
+            "type": "integer"
+          },
+          "categoryId": {
+            "type": "string"
+          },
+          "vendorId": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string",
+            "nullable": true
+          },
+          "weightKg": {
+            "type": "number"
+          },
+          "offerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "wholesalePrice": {
+            "type": "number",
+            "nullable": true
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "admin",
+              "painter",
+              "vendor",
+              "designer"
+            ]
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "مسار نسبي مثل /uploads/..."
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "الحساب مفعّل؛ الافتراضي true للمستخدمين الجدد"
+          },
+          "status": {
+            "type": "boolean",
+            "description": "نفس معنى isActive (للوحة التحكم)"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "MeProfileResponse": {
+        "type": "object",
+        "description": "المستخدم بدون كلمة المرور + canBuyWholesale + بروفايل مصمم/فني عند وجوده",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "boolean",
+            "description": "نسخة لوحة التحكم من isActive"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "canBuyWholesale": {
+            "type": "boolean"
+          },
+          "designerProfile": {
+            "type": "object",
+            "nullable": true,
+            "description": "عند role=designer",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "userId": {
+                "type": "string"
+              },
+              "experience": {
+                "type": "integer",
+                "nullable": true
+              },
+              "specialties": {
+                "type": "string",
+                "nullable": true
+              },
+              "rating": {
+                "type": "number",
+                "nullable": true
+              },
+              "portfolio": {
+                "type": "string",
+                "nullable": true
+              },
+              "bio": {
+                "type": "string",
+                "nullable": true
+              },
+              "location": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          },
+          "painterProfile": {
+            "type": "object",
+            "nullable": true,
+            "description": "عند role=painter؛ يتضمن gallery",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "userId": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "experience": {
+                "type": "integer"
+              },
+              "serviceType": {
+                "type": "string"
+              },
+              "bio": {
+                "type": "string",
+                "nullable": true
+              },
+              "rating": {
+                "type": "number"
+              },
+              "gallery": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PainterGalleryItem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PainterGalleryItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "painterId": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "مسار نسبي للصورة"
+          }
+        }
+      },
+      "UserUpdateBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "description": "للمشرف فقط"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AvatarUploadResponse": {
+        "type": "object",
+        "properties": {
+          "avatarUrl": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "DesignerProfileResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "profileId": {
+            "type": "string",
+            "nullable": true
+          },
+          "experience": {
+            "type": "integer",
+            "nullable": true
+          },
+          "specialties": {
+            "type": "string",
+            "nullable": true
+          },
+          "rating": {
+            "type": "number",
+            "nullable": true
+          },
+          "portfolio": {
+            "type": "string",
+            "nullable": true
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "DesignerUpdateBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "experience": {
+            "type": "integer",
+            "nullable": true
+          },
+          "specialties": {
+            "type": "string",
+            "nullable": true
+          },
+          "rating": {
+            "type": "number",
+            "nullable": true
+          },
+          "portfolio": {
+            "type": "string",
+            "nullable": true
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PainterWithGallery": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "experience": {
+            "type": "integer"
+          },
+          "serviceType": {
+            "type": "string"
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "rating": {
+            "type": "number"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          },
+          "gallery": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PainterGalleryItem"
+            }
+          }
+        }
+      },
+      "PainterMeUpdateBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "experience": {
+            "type": "integer"
+          },
+          "serviceType": {
+            "type": "string"
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PainterCreateBody": {
+        "type": "object",
+        "required": [
+          "userId"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "experience": {
+            "type": "integer"
+          },
+          "serviceType": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "userId": "a3ba5f2b-83df-4f2f-b42f-b182a496d6b3",
+          "city": "Riyadh",
+          "address": "Al Olaya",
+          "experience": 4,
+          "serviceType": "interior"
+        }
+      },
+      "PainterUpdateBody": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "experience": {
+            "type": "integer"
+          },
+          "serviceType": {
+            "type": "string"
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "example": {
+          "city": "Jeddah",
+          "address": "Al Rawdah",
+          "experience": 6,
+          "serviceType": "both",
+          "bio": "Painter specialized in indoor/outdoor projects."
+        }
+      },
+      "CartItemInput": {
+        "type": "object",
+        "required": [
+          "paintId",
+          "quantity"
+        ],
+        "properties": {
+          "paintId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "CartItemUpdateBody": {
+        "type": "object",
+        "required": [
+          "quantity"
+        ],
+        "properties": {
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "CartItemResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "paintId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "unitPrice": {
+            "type": "number"
+          },
+          "lineTotal": {
+            "type": "number"
+          },
+          "paint": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "image": {
+                "type": "string",
+                "nullable": true
+              },
+              "price": {
+                "type": "number"
+              },
+              "wholesalePrice": {
+                "type": "number",
+                "nullable": true
+              },
+              "stock": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "CartResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "canBuyWholesale": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CartItemResponse"
+            }
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "discountValue": {
+            "type": "number",
+            "description": "قيمة خصم الكوبون على مستوى السلة"
+          },
+          "total": {
+            "type": "number"
+          },
+          "couponCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "couponValid": {
+            "type": "boolean",
+            "nullable": true
+          }
+        }
+      },
+      "PaymentMethodId": {
+        "type": "string",
+        "enum": [
+          "visa",
+          "mastercard",
+          "apple_pay"
+        ],
+        "description": "طريقة الدفع المحفوظة مع الطلب (تسجيل فقط)"
+      },
+      "CheckoutRequestBody": {
+        "type": "object",
+        "required": [
+          "paymentMethod"
+        ],
+        "description": "إتمام الطلب من السلة. paymentMethod إلزامي، وبيانات الشحن اختيارية لكن يفضل إرسالها لعرضها في تفاصيل الطلب. يدعم أيضاً الحقول البديلة: shippingCity, shippingPhone, address, zipCode.",
+        "properties": {
+          "paymentMethod": {
+            "$ref": "#/components/schemas/PaymentMethodId"
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLine1": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLine2": {
+            "type": "string",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "shippingCity": {
+            "type": "string",
+            "nullable": true,
+            "description": "Alias for city"
+          },
+          "shippingPhone": {
+            "type": "string",
+            "nullable": true,
+            "description": "Alias for phone"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "Alias for addressLine1"
+          },
+          "zipCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Alias for postalCode"
+          },
+          "couponCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "كود الكوبون (اختياري)"
+          }
+        },
+        "example": {
+          "paymentMethod": "visa",
+          "city": "Riyadh",
+          "addressLine1": "King Fahd Rd, Building 15",
+          "addressLine2": "Floor 2, Apt 6",
+          "postalCode": "12271",
+          "phone": "+9665XXXXXXX"
+        }
+      },
+      "ShippingInfo": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLine1": {
+            "type": "string",
+            "nullable": true
+          },
+          "addressLine2": {
+            "type": "string",
+            "nullable": true
+          },
+          "postalCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PaymentMethodOption": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/PaymentMethodId"
+          },
+          "label": {
+            "type": "string",
+            "example": "Visa"
+          }
+        }
+      },
+      "CheckoutResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "subtotalPrice": {
+            "type": "number"
+          },
+          "discountValue": {
+            "type": "number"
+          },
+          "couponCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalPrice": {
+            "type": "number"
+          },
+          "paymentMethod": {
+            "$ref": "#/components/schemas/PaymentMethodId"
+          },
+          "shipping": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ShippingInfo"
+              }
+            ],
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "paintId": {
+                  "type": "string"
+                },
+                "paintName": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "integer"
+                },
+                "unitPrice": {
+                  "type": "number"
+                },
+                "lineTotal": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      },
+      "MyOrderLineItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paintId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "unitPrice": {
+            "type": "number",
+            "nullable": true
+          },
+          "lineTotal": {
+            "type": "number"
+          },
+          "paint": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "image": {
+                "type": "string",
+                "nullable": true
+              },
+              "price": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "MyOrderListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderNumber": {
+            "type": "string",
+            "example": "ORD-uuid…"
+          },
+          "invoiceNumber": {
+            "type": "string",
+            "example": "INV-uuid…"
+          },
+          "totalPrice": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "description": "حالة الطلب في النظام (مثل pending، delivered)"
+          },
+          "invoiceStatus": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "pending"
+            ],
+            "description": "مدفوع إذا اكتمل التسليم"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paymentMethod": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMethodId"
+              }
+            ],
+            "nullable": true,
+            "description": "قد يكون null لطلبات قديمة"
+          },
+          "shipping": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ShippingInfo"
+              }
+            ],
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyOrderLineItem"
+            }
+          }
+        }
+      },
+      "MyOrderDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "painterId": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalPrice": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "area": {
+            "type": "number",
+            "nullable": true
+          },
+          "serviceDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "serviceTime": {
+            "type": "string",
+            "nullable": true
+          },
+          "zone": {
+            "type": "string",
+            "nullable": true
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "invoiceStatus": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "pending"
+            ]
+          },
+          "paymentMethod": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMethodId"
+              }
+            ],
+            "nullable": true
+          },
+          "shipping": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ShippingInfo"
+              }
+            ],
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyOrderLineItem"
+            }
+          }
+        }
+      },
+      "DashboardInvoiceRow": {
+        "type": "object",
+        "description": "صف يُعاد من GET /api/invoices",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "pending"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          },
+          "order": {
+            "type": "object",
+            "description": "كائن الطلب الأصلي مع source"
+          }
+        }
+      },
+      "MessageOk": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Deleted"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "description": "JWT يحتوي على id و role و canBuyWholesale (تاجر معتمد، أو دور vendor/designer، أو موافقة جملة)"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "VisitRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clientUserId": {
+            "type": "string"
+          },
+          "clientName": {
+            "type": "string",
+            "nullable": true,
+            "description": "اسم العميل (مفيد للفني/الأدمن)"
+          },
+          "clientPhone": {
+            "type": "string",
+            "nullable": true,
+            "description": "رقم جوال العميل (مفيد للفني/الأدمن)"
+          },
+          "painterId": {
+            "type": "string"
+          },
+          "scheduledDate": {
+            "type": "string",
+            "description": "YYYY-MM-DD"
+          },
+          "scheduledTime": {
+            "type": "string"
+          },
+          "area": {
+            "type": "number",
+            "nullable": true
+          },
+          "region": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected",
+              "completed"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "VisitRequestCreateBody": {
+        "type": "object",
+        "required": [
+          "painterId",
+          "scheduledDate",
+          "scheduledTime",
+          "address"
+        ],
+        "description": "ينطبق على POST /visit-requests وأيضًا POST /painter-requests (alias).",
+        "properties": {
+          "painterId": {
+            "type": "string"
+          },
+          "scheduledDate": {
+            "type": "string",
+            "description": "YYYY-MM-DD"
+          },
+          "scheduledTime": {
+            "type": "string"
+          },
+          "area": {
+            "type": "number",
+            "nullable": true
+          },
+          "region": {
+            "type": "string",
+            "nullable": true,
+            "description": "المنطقة / الحي"
+          },
+          "address": {
+            "type": "string",
+            "description": "عنوان العميل الكامل لموعد الزيارة"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "example": {
+          "painterId": "f1942d5f-1b4f-4f3f-8d8e-e3b0f1f3375a",
+          "scheduledDate": "2026-03-28",
+          "scheduledTime": "14:30",
+          "area": 120,
+          "region": "Al Yasmin",
+          "address": "King Fahd Rd, Building 15, Floor 2",
+          "notes": "Please call before arriving."
+        }
+      },
+      "PainterReviewCreateBody": {
+        "type": "object",
+        "required": [
+          "painterId",
+          "review",
+          "rating"
+        ],
+        "properties": {
+          "painterId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "review": {
+            "type": "string"
+          },
+          "rating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/signup": {
+      "post": {
+        "summary": "Register a new user",
+        "tags": [
+          "Auth"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "email",
+                  "phone",
+                  "password"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "default": "user"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully"
+          },
+          "400": {
+            "description": "Missing fields or user already exists"
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "summary": "Login a user",
+        "tags": [
+          "Auth"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "phone",
+                  "password"
+                ],
+                "properties": {
+                  "phone": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid password"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/auth/forgot-password/otp": {
+      "post": {
+        "summary": "Request password reset OTP",
+        "tags": [
+          "Auth"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "identifier"
+                ],
+                "properties": {
+                  "identifier": {
+                    "type": "string",
+                    "description": "User phone or email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP generated successfully"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/auth/forgot-password/verify-otp": {
+      "post": {
+        "summary": "Verify password reset OTP",
+        "tags": [
+          "Auth"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "identifier",
+                  "otp"
+                ],
+                "properties": {
+                  "identifier": {
+                    "type": "string"
+                  },
+                  "otp": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP is valid"
+          },
+          "400": {
+            "description": "OTP invalid/expired"
+          }
+        }
+      }
+    },
+    "/auth/forgot-password/reset": {
+      "post": {
+        "summary": "Reset password using OTP",
+        "tags": [
+          "Auth"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "identifier",
+                  "otp",
+                  "newPassword",
+                  "confirmPassword"
+                ],
+                "properties": {
+                  "identifier": {
+                    "type": "string"
+                  },
+                  "otp": {
+                    "type": "string"
+                  },
+                  "newPassword": {
+                    "type": "string"
+                  },
+                  "confirmPassword": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset successful"
+          },
+          "400": {
+            "description": "Validation/OTP failure"
+          }
+        }
+      }
+    },
+    "/designers": {
+      "get": {
+        "tags": [
+          "Designers"
+        ],
+        "summary": "قائمة المصممين مع الملف المهني (bio، location، ...)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "مصفوفة عناصر تحتوي user وحقول الملف",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DesignerProfileResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/designers/me": {
+      "get": {
+        "tags": [
+          "Designers"
+        ],
+        "summary": "بروفايل المصمم الحالي (JWT، دور designer)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignerProfileResponse"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Designers"
+        ],
+        "summary": "تحديث بروفايل المصمم الحالي (نفس حقول PUT /designers/{userId})",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignerUpdateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignerProfileResponse"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "401": {
+            "description": "Response"
+          },
+          "403": {
+            "description": "Response"
+          },
+          "404": {
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/designers/{userId}": {
+      "get": {
+        "tags": [
+          "Designers"
+        ],
+        "summary": "تفاصيل مصمم بالمعرف",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignerProfileResponse"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "404": {
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/vendor-requests": {
+      "get": {
+        "tags": [
+          "Vendor Requests"
+        ],
+        "summary": "قائمة طلبات الجملة/التحول لتاجر المعلقة",
+        "description": "للمشرف؛ يُرجع vendors غير المعتمدين مع requestType و user.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "قائمة الطلبات",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PendingVendorRequest"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "خطأ خادم"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vendor Requests"
+        ],
+        "summary": "تقديم طلب التحول إلى تاجر",
+        "description": "الحقول الإلزامية: userId، shopName (اسم الشركة)، taxRegistration، companyType،\nfullName، email، phone، companyAddress. اختياري: city.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorUpgradeRequestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "المستخدم تاجر بالفعل، أو طلب معتمد مسبقاً، أو تحديث طلب قائم",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorRequestSubmitResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "تم إنشاء الطلب",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorRequestSubmitResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "حقول ناقصة أو غير صالحة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "userId غير موجود",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "خطأ خادم",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wholesale-requests": {
+      "post": {
+        "tags": [
+          "Vendor Requests"
+        ],
+        "summary": "تقديم طلب شراء بالجملة",
+        "description": "للمستخدم/المصمم لطلب تفعيل أسعار الجملة؛ تظهر الطلبات مع طلبات التحول لتاجر في لوحة الطلبات،\nوعند موافقة المشرف يُعتمد الطلب ويُحدَّث دور المستخدم إلى vendor.\nالحقول الإلزامية: userId، shopName، taxRegistration، companyType، fullName،\nemail، phone، companyAddress. اختياري: city.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WholesaleRequestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "المستخدم تاجر بالفعل، أو وصول جملة معتمد، أو تحديث طلب قائم",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorRequestSubmitResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "تم إنشاء الطلب",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorRequestSubmitResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "حقول ناقصة أو غير صالحة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "userId غير موجود",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "خطأ خادم",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vendors/approve/{vendorId}": {
+      "put": {
+        "tags": [
+          "Vendor Requests"
+        ],
+        "summary": "الموافقة على المورد أو تحديث حالة الدفع",
+        "description": "عند isApproved=true ونوع الطلب VENDOR أو WHOLESALE يُرقّى المستخدم إلى دور vendor.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveVendorBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "سجل vendor محدث مع requestType و user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingVendorRequest"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "خطأ خادم",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": [
+          "Categories"
+        ],
+        "summary": "قائمة الأقسام مع عدد المنتجات لكل قسم",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "مصفوفة أقسام",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryWithPaintCount"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "خطأ خادم",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/offers": {
+      "get": {
+        "tags": [
+          "Offers"
+        ],
+        "summary": "قائمة العروض",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "مصفوفة العروض"
+          }
+        }
+      }
+    },
+    "/coupons": {
+      "get": {
+        "tags": [
+          "Offers"
+        ],
+        "summary": "قائمة الكوبونات",
+        "description": "نفس العروض لكن بنوع `coupon`.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "مصفوفة كوبونات"
+          }
+        }
+      }
+    },
+    "/api/invoices": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "قائمة الفواتير (جميع الطلبات)",
+        "description": "استجابة بصيغة فاتورة لكل طلب في النظام (مفيدة للداشبورد). لعرض طلبات مستخدم واحد فقط استخدم `GET /orders` مع رمز المصادقة.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "مصفوفة فواتير",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DashboardInvoiceRow"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/cart": {
+      "get": {
+        "tags": [
+          "Cart"
+        ],
+        "summary": "عرض سلة المستخدم الحالي",
+        "description": "المسار الفعلي يدعم أيضاً `/api/cart`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "عناصر السلة مع الإجماليات",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/cart/quote": {
+      "post": {
+        "tags": [
+          "Cart"
+        ],
+        "summary": "تسعير السلة مع كوبون قبل إتمام الطلب",
+        "description": "يُستخدم لاحتساب subtotal/discount/total بعد تمرير couponCode (اختياري).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "couponCode": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ملخص السلة بعد تطبيق الكوبون",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "الكوبون غير صالح/منتهي",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cart/items": {
+      "post": {
+        "tags": [
+          "Cart"
+        ],
+        "summary": "إضافة منتج للسلة أو زيادة كميته",
+        "description": "المسار الفعلي يدعم أيضاً `/api/cart/items`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CartItemInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "تم التحديث",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartItemResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "تم الإضافة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/cart/items/{itemId}": {
+      "patch": {
+        "tags": [
+          "Cart"
+        ],
+        "summary": "تعديل كمية عنصر في السلة",
+        "description": "المسار الفعلي يدعم أيضاً `/api/cart/items/{itemId}`. ويمكن استخدام PUT كذلك.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CartItemUpdateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "تم التعديل",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "404": {
+            "description": "العنصر غير موجود",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Cart"
+        ],
+        "summary": "حذف عنصر من السلة",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "itemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "تم الحذف",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOk"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/checkout": {
+      "post": {
+        "tags": [
+          "Cart"
+        ],
+        "summary": "إنشاء أوردر للعميل (Checkout من السلة)",
+        "description": "المسار الفعلي يدعم أيضاً `/api/checkout`. فلو الطلب الكامل: GET /payment-methods -> POST /cart/items -> GET /cart -> POST /checkout -> GET /orders -> GET /orders/{id}. يجب إرسال طريقة الدفع (تسجيل فقط؛ بدون تحصيل إلكتروني).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequestBody"
+              },
+              "example": {
+                "paymentMethod": "visa",
+                "city": "Riyadh",
+                "addressLine1": "King Fahd Rd, Building 15",
+                "addressLine2": "Floor 2, Apt 6",
+                "postalCode": "12271",
+                "phone": "+9665XXXXXXX"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "تم إنشاء الطلب (تتضمن الاستجابة shipping عند إرسال بيانات الشحن)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "السلة فارغة أو مخزون غير كافٍ أو paymentMethod غير صالحة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/painters": {
+      "get": {
+        "tags": [
+          "Painters request"
+        ],
+        "summary": "قائمة الفنيين مع user ومعرض الصور gallery",
+        "description": "العميل يفلتر بنوع الخدمة والعنوان. مثال: GET /painters?serviceType=interior&address=Riyadh",
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "address",
+            "description": "تصفية حسب عنوان/مدينة الفني (مطابقة جزئية)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "serviceType",
+            "description": "interior أو exterior",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "interior",
+                "exterior"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PainterWithGallery"
+                  }
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/painters/me": {
+      "get": {
+        "tags": [
+          "Painters"
+        ],
+        "summary": "بروفايل الفني الحالي (JWT، دور painter) مع gallery",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PainterWithGallery"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "401": {
+            "description": "Missing/invalid token"
+          },
+          "403": {
+            "description": "Painters only"
+          },
+          "404": {
+            "description": "Painter profile not found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Painters"
+        ],
+        "summary": "تحديث بروفايل الفني الحالي (اسم/بريد/هاتف + بيانات الفني)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PainterMeUpdateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PainterWithGallery"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/painters/me/gallery": {
+      "post": {
+        "tags": [
+          "Painters"
+        ],
+        "summary": "إضافة صورة لمعرض أعمال الفني (multipart، الحقل image)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image"
+                ],
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PainterGalleryItem"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "400": {
+            "description": "Invalid image upload"
+          },
+          "401": {
+            "description": "Missing/invalid token"
+          },
+          "403": {
+            "description": "Painters only"
+          }
+        }
+      }
+    },
+    "/painters/me/gallery/{galleryId}": {
+      "delete": {
+        "tags": [
+          "Painters"
+        ],
+        "summary": "حذف صورة من المعرض (صاحب الفني)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "galleryId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOk"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "404": {
+            "description": "Gallery item not found"
+          }
+        }
+      }
+    },
+    "/painters/{id}": {
+      "get": {
+        "tags": [
+          "Painters request"
+        ],
+        "summary": "كل بيانات الفني بالصور (gallery) للمستخدم",
+        "description": "يرجع بيانات الفني + user + gallery + آخر 5 reviews مع بيانات العميل.",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PainterWithGallery"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "404": {
+            "description": "Painter not found"
+          }
+        }
+      }
+    },
+    "/painters/gallery/{galleryId}/like": {
+      "get": {
+        "tags": [
+          "Painters request"
+        ],
+        "summary": "حالة الإعجاب لصورة معرض الفني + عدد الإعجابات",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "galleryId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Like status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galleryId": {
+                      "type": "string"
+                    },
+                    "likesCount": {
+                      "type": "integer"
+                    },
+                    "isLiked": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid token"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Painters request"
+        ],
+        "summary": "تبديل الإعجاب (Like/Unlike) لصورة معرض الفني",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "galleryId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Toggled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galleryId": {
+                      "type": "string"
+                    },
+                    "likesCount": {
+                      "type": "integer"
+                    },
+                    "isLiked": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid token"
+          }
+        }
+      }
+    },
+    "/painter-reviews": {
+      "post": {
+        "tags": [
+          "Painters request"
+        ],
+        "summary": "إضافة تقييم (JWT مستخدم)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PainterReviewCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/orders": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "طلبات المستخدم الحالي",
+        "description": "قائمة طلبات الشراء الخاصة بالمستخدم المُوثَّق. تتضمن لكل طلب كائن `shipping` (city,addressLine1,addressLine2,postalCode,phone). يدعم أيضاً `GET /api/orders`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "مصفوفة الطلبات مع بنود مختصرة ورقم الفاتورة لكل طلب",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MyOrderListItem"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "تفاصيل طلب وفاتورته",
+        "description": "تفاصيل طلب واحد يملكه المستخدم فقط، مع بنود السطر ورقم الفاتورة وبيانات الشحن داخل `shipping`. يدعم أيضاً `GET /api/orders/{id}`.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "معرّف الطلب"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "الطلب مع بنود الفاتورة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyOrderDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "403": {
+            "description": "الطلب لا يخص المستخدم الحالي",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/banners": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "قائمة البنرات (صور فقط)",
+        "description": "تُستخدم في واجهة المستخدم/الموبايل لعرض صور البنر.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "مصفوفة صور البنر",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "imageUrl": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/designs": {
+      "get": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "عرض التصاميم",
+        "description": "يدعم الفلترة بـ `designerId` أو `designerName`.",
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "designerId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "designerName",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "قائمة التصاميم",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Design"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "إضافة تصميم (مصمم/أدمن)",
+        "description": "المصمم أو الأدمن فقط يمكنه إضافة تصميم.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "تم إضافة التصميم",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Design"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/designs/{id}": {
+      "get": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "تفاصيل تصميم",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "بيانات التصميم",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Design"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "تعديل تصميم (صاحب التصميم/أدمن)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignUpdateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "تم التعديل"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "حذف تصميم (صاحب التصميم/أدمن)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "تم الحذف"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/designs/{id}/comments": {
+      "get": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "عرض تعليقات التصميم",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "قائمة التعليقات"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "تعليق على التصميم (مستخدم مسجّل)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignCommentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "تم إضافة التعليق"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/designs/{id}/comments/{commentId}": {
+      "delete": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "حذف تعليق (صاحب التعليق/أدمن)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "commentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "تم حذف التعليق"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/designs/{id}/favorite": {
+      "get": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "حالة الإعجاب للتصميم الحالي",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "حالة الإعجاب",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FavoriteToggleResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "إضافة/إزالة إعجاب (toggle)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "حالة الإعجاب بعد التنفيذ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FavoriteToggleResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/designs/{id}/requests": {
+      "get": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "عرض طلبات التصميم (للمصمم / الأدمن)",
+        "description": "المصمم يعرض طلبات كل تصميم يملكه عبر هذا المسار لكل designId (بعد جلب تصاميمه بـ GET /designs?designerId=...). الأدمن يراها لأي تصميم. الاستجابة تتضمن clientName و clientPhone. لتحديث الحالة استخدم PUT /designs/{designId}/requests/{requestId}/status.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "قائمة الطلبات (الأحدث أولاً)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DesignRequest"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ليس صاحب التصميم وليس أدمن",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "طلب مصمم على هذا التصميم",
+        "description": "أي مستخدم مسجل (مثل user، painter، vendor، designer، admin). يُحدد العميل من التوكن؛ الحقل description إلزامي.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignRequestBody"
+              },
+              "example": {
+                "description": "طلب تنفيذ التصميم مع تفاصيل الغرفة والألوان المفضلة.",
+                "imageUrl": null,
+                "videoUrl": null
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "تم إنشاء الطلب (بدون تضمين clientName/clientPhone في نفس الاستجابة)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/designs/{designId}/requests/{requestId}/status": {
+      "put": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "تحديث حالة طلب التصميم",
+        "description": "صاحب التصميم (المصمم) أو الأدمن. استخدم نفس designId المنبثق من قائمة التصاميم أو من GET /designs/{designId}/requests.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "designId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignRequestStatusBody"
+              },
+              "examples": {
+                "accepted": {
+                  "summary": "قبول الطلب",
+                  "value": {
+                    "status": "accepted"
+                  }
+                },
+                "completed": {
+                  "summary": "إتمام الطلب",
+                  "value": {
+                    "status": "completed"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "الطلب بعد التحديث (يتضمن clientName و clientPhone عند النجاح)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/designs/{id}/share": {
+      "get": {
+        "tags": [
+          "Designs"
+        ],
+        "summary": "رابط مشاركة التصميم",
+        "description": "يعيد رابط مشاركة جاهز للواجهة.",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "رابط المشاركة",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignShareResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/paints": {
+      "get": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "قائمة جميع المنتجات (الدهانات)",
+        "description": "يعيد صفوف من جدول paint مع إضافة `minStockLevel` الافتراضي عند الحاجة.",
+        "security": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "categoryId",
+            "description": "تصفية المنتجات حسب معرف القسم (UUID)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "مصفوفة منتجات",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaintListItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/paint/{id}": {
+      "get": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "تفاصيل منتج بالمعرّف",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "معرّف المنتج (UUID)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "بيانات المنتج",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaintDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "معرّف غير صالح",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "غير موجود",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/visit-requests": {
+      "get": {
+        "tags": [
+          "VisitRequests"
+        ],
+        "summary": "قائمة طلبات الزيارة (الفني يرى طلباته عبر forPainter=true)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "mine",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "forPainter",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ]
+            },
+            "description": "عند إرسالها يستطيع الفني جلب جميع الطلبات الموجهة له"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VisitRequest"
+                  }
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "VisitRequests"
+        ],
+        "summary": "إنشاء طلب زيارة",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitRequestCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitRequest"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    },
+    "/visit-requests/{id}": {
+      "get": {
+        "tags": [
+          "VisitRequests"
+        ],
+        "summary": "طلب زيارة بالمعرف",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitRequest"
+                }
+              }
+            },
+            "description": "Response"
+          }
+        }
+      }
+    }
+  }
+}
