@@ -133,7 +133,7 @@ import {
 } from "./controllers/visitRequestController.js";
 import { authorize } from "./utils/auth.js";
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 const swaggerUiPath = swaggerUiDist.getAbsoluteFSPath();
 
 // CORS: allow frontend (Vite default 5173, etc.) to call the API
