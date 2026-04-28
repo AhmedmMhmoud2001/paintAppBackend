@@ -2,6 +2,7 @@ import prisma from "../prismaClient.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { randomUUID } from "crypto";
+import { authenticate } from "../utils/auth.js";
 
 function isMissingIsActiveColumnError(err) {
   const msg = String(err?.message || "");
@@ -60,7 +61,7 @@ async function buildTokenForUser(user) {
  * @swagger
  * /signup:
  *   post:
- *     summary: Register a new user
+ *     summary: Register a new client account
  *     tags: [Auth]
  *     security: []
  *     requestBody:
@@ -77,20 +78,32 @@ async function buildTokenForUser(user) {
  *             properties:
  *               name:
  *                 type: string
+ *                 example: "Ahmed Ali"
  *               email:
  *                 type: string
+ *                 format: email
+ *                 example: "ahmed@example.com"
  *               phone:
  *                 type: string
+ *                 description: "8-15 digits, optional leading +"
+ *                 example: "+201001234567"
  *               password:
  *                 type: string
- *               role:
- *                 type: string
- *                 default: user
+ *                 minLength: 6
+ *                 example: "P@ssw0rd123"
+ *             additionalProperties: false
+ *           example:
+ *             name: "Ahmed Ali"
+ *             email: "ahmed@example.com"
+ *             phone: "+201001234567"
+ *             password: "P@ssw0rd123"
  *     responses:
  *       201:
  *         description: User created successfully
  *       400:
- *         description: Missing fields or user already exists
+ *         description: Missing fields, invalid email/phone, or user already exists
+ *       403:
+ *         description: role is not allowed in public signup
  */
 export const signup = async (req, res, body) => {
   try {
@@ -99,6 +112,7 @@ export const signup = async (req, res, body) => {
     const email = raw.email != null ? String(raw.email).trim().toLowerCase() : "";
     const phone = raw.phone != null ? String(raw.phone).trim() : "";
     const password = raw.password != null ? String(raw.password) : "";
+    const requestedRole = raw.role != null ? String(raw.role).trim().toLowerCase() : "";
 
     if (!name || !email || !phone || !password) {
       res.writeHead(400, { "Content-Type": "application/json" });
@@ -107,17 +121,40 @@ export const signup = async (req, res, body) => {
       );
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "صيغة البريد الإلكتروني غير صحيحة" }));
+    }
+
+    // Accept international/local numbers with optional leading + and 8-15 digits.
+    const normalizedPhone = phone.replace(/[\s-]/g, "");
+    const phoneRegex = /^\+?\d{8,15}$/;
+    if (!phoneRegex.test(normalizedPhone)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "صيغة رقم الجوال غير صحيحة" }));
+    }
+    const phoneValue = normalizedPhone;
+
+    // Public signup must never allow privilege elevation by role injection.
+    if (requestedRole && requestedRole !== "user") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      return res.end(
+        JSON.stringify({ error: "غير مسموح بتحديد role عند التسجيل العام" }),
+      );
+    }
+
     let existingUser;
     try {
       existingUser = await prisma.user.findFirst({
-        where: { OR: [{ email }, { phone }] },
+        where: { OR: [{ email }, { phone: phoneValue }] },
       });
     } catch (e) {
       if (!isMissingIsActiveColumnError(e)) throw e;
       const rows = await prisma.$queryRawUnsafe(
         "SELECT `id` FROM `user` WHERE `email` = ? OR `phone` = ? LIMIT 1",
         email,
-        phone,
+        phoneValue,
       );
       existingUser = Array.isArray(rows) && rows[0] ? rows[0] : null;
     }
@@ -135,7 +172,7 @@ export const signup = async (req, res, body) => {
         data: {
           name,
           email,
-          phone,
+          phone: phoneValue,
           password: hashedPassword,
           role: "user",
           isActive: true,
@@ -148,7 +185,7 @@ export const signup = async (req, res, body) => {
           data: {
             name,
             email,
-            phone,
+            phone: phoneValue,
             password: hashedPassword,
             role: "user",
           },
@@ -161,7 +198,7 @@ export const signup = async (req, res, body) => {
           id,
           name,
           email,
-          phone,
+          phoneValue,
           hashedPassword,
           "user",
         );
@@ -169,14 +206,14 @@ export const signup = async (req, res, body) => {
           "SELECT `id`,`name`,`email`,`phone`,`role`,`avatarUrl`,`createdAt` FROM `user` WHERE `id` = ? LIMIT 1",
           id,
         );
-        user = Array.isArray(rows) && rows[0] ? rows[0] : { id, name, email, phone, role: "user" };
+        user = Array.isArray(rows) && rows[0] ? rows[0] : { id, name, email, phone: phoneValue, role: "user" };
       }
     }
 
     const token = await buildTokenForUser(user);
     await writeAudit(user.id, "SIGNUP_SUCCESS", {
       email,
-      phone,
+      phone: phoneValue,
       role: user.role,
     });
     const { password: _p, ...pub } = user;
@@ -213,8 +250,10 @@ export const signup = async (req, res, body) => {
  *             properties:
  *               phone:
  *                 type: string
+ *                 example: "+201001234567"
  *               password:
  *                 type: string
+ *                 example: "P@ssw0rd123"
  *     responses:
  *       200:
  *         description: Login successful
@@ -230,36 +269,33 @@ export const signup = async (req, res, body) => {
 export const login = async (req, res, body) => {
   try {
     const raw = JSON.parse(body);
+    const phone = String(raw.phone || "").trim();
     const password = raw.password != null ? String(raw.password) : "";
-    const identifier = String(raw.phone || raw.email || "").trim();
 
-    if (!identifier || !password) {
+    if (!phone || !password) {
       res.writeHead(400, { "Content-Type": "application/json" });
       return res.end(
-        JSON.stringify({ error: "يرجى إدخال الجوال أو البريد وكلمة المرور" }),
+        JSON.stringify({ error: "يرجى إدخال رقم الجوال وكلمة المرور" }),
       );
     }
 
     let user;
     try {
       user = await prisma.user.findFirst({
-        where: {
-          OR: [{ phone: identifier }, { email: identifier.toLowerCase() }],
-        },
+        where: { phone },
       });
     } catch (e) {
       if (!isMissingIsActiveColumnError(e)) throw e;
       const rows = await prisma.$queryRawUnsafe(
-        "SELECT `id`,`name`,`email`,`phone`,`password`,`role` FROM `user` WHERE `phone` = ? OR `email` = ? LIMIT 1",
-        identifier,
-        identifier.toLowerCase(),
+        "SELECT `id`,`name`,`email`,`phone`,`password`,`role` FROM `user` WHERE `phone` = ? LIMIT 1",
+        phone,
       );
       user = Array.isArray(rows) && rows[0] ? rows[0] : null;
     }
     if (!user) {
       await writeAudit(null, "LOGIN_FAILED", {
         reason: "user_not_found",
-        identifier,
+        identifier: phone,
       });
       res.writeHead(404, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ error: "User not found" }));
@@ -269,7 +305,7 @@ export const login = async (req, res, body) => {
     if (!isValid) {
       await writeAudit(user.id, "LOGIN_FAILED", {
         reason: "invalid_password",
-        identifier,
+        identifier: phone,
       });
       res.writeHead(401, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ error: "Invalid password" }));
@@ -282,7 +318,7 @@ export const login = async (req, res, body) => {
     ) {
       await writeAudit(user.id, "LOGIN_FAILED", {
         reason: "account_disabled",
-        identifier,
+        identifier: phone,
       });
       res.writeHead(403, { "Content-Type": "application/json" });
       return res.end(
@@ -292,7 +328,7 @@ export const login = async (req, res, body) => {
 
     const token = await buildTokenForUser(user);
     await writeAudit(user.id, "LOGIN_SUCCESS", {
-      identifier,
+      identifier: phone,
       role: user.role,
     });
 
@@ -544,6 +580,77 @@ export const resetPasswordWithOtp = async (req, res, body) => {
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ message: "Password reset successful" }));
+  } catch (err) {
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: err.message }));
+  }
+};
+
+/**
+ * @swagger
+ * /auth/delete-account:
+ *   delete:
+ *     summary: Delete current user account
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: mode
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [soft, hard]
+ *           default: soft
+ *         description: soft = disable account, hard = permanent delete
+ *     responses:
+ *       200:
+ *         description: Account deleted or deactivated successfully
+ *       401:
+ *         description: Missing/invalid token
+ */
+export const deleteCurrentAccount = async (req, res) => {
+  try {
+    let authUser;
+    try {
+      authUser = authenticate(req);
+    } catch (err) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: err.message || "Unauthorized" }));
+    }
+
+    const userId = String(authUser?.id || "").trim();
+    if (!userId) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Unauthorized" }));
+    }
+
+    const rawMode = String(req?.query?.mode || "").toLowerCase();
+    const mode = rawMode === "hard" ? "hard" : "soft";
+
+    if (mode === "hard") {
+      await prisma.user.delete({ where: { id: userId } });
+      await writeAudit(userId, "ACCOUNT_DELETED", { mode: "hard" });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ message: "Account deleted permanently", mode }));
+    }
+
+    // Soft delete: disable account without removing rows.
+    try {
+      await prisma.$executeRawUnsafe(
+        "UPDATE `user` SET `isBlocked` = 1, `isActive` = 0, `isDeleted` = 1, `deletedAt` = NOW() WHERE `id` = ?",
+        userId,
+      );
+    } catch (_) {
+      await prisma.$executeRawUnsafe(
+        "UPDATE `user` SET `isBlocked` = 1 WHERE `id` = ?",
+        userId,
+      );
+    }
+
+    await writeAudit(userId, "ACCOUNT_DELETED", { mode: "soft" });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ message: "Account deactivated", mode }));
   } catch (err) {
     res.writeHead(500, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: err.message }));

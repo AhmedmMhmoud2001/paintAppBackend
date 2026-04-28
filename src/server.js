@@ -178,7 +178,9 @@ const server = http.createServer(async (req, res) => {
     pathname === "/auth/forgot-password/verify-otp" ||
     pathname === "/api/auth/forgot-password/verify-otp" ||
     pathname === "/auth/forgot-password/reset" ||
-    pathname === "/api/auth/forgot-password/reset"
+    pathname === "/api/auth/forgot-password/reset" ||
+    pathname === "/auth/delete-account" ||
+    pathname === "/api/auth/delete-account"
   ) {
     return handleAuthRoutes(req, res, pathname);
   }

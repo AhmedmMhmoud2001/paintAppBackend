@@ -4,6 +4,7 @@ import {
   requestPasswordResetOtp,
   verifyPasswordResetOtp,
   resetPasswordWithOtp,
+  deleteCurrentAccount,
 } from "../controllers/authController.js";
 
 const normPath = (pathname) =>
@@ -67,6 +68,10 @@ export const handleAuthRoutes = async (req, res, pathnameOpt) => {
   ) {
     const body = await readJsonBody();
     return resetPasswordWithOtp(req, res, body);
+  }
+
+  if (path === "/auth/delete-account" && req.method === "DELETE") {
+    return deleteCurrentAccount(req, res);
   }
 
   res.writeHead(404, { "Content-Type": "application/json" });

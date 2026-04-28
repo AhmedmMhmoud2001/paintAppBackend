@@ -18,8 +18,8 @@ const options = {
         description: "Local Development Server",
       },
       {
-         url: "https://tovo-b.developteam.site/kids-tovo/api", 
-         description: "Production/Live Server"
+        url: "https://paint.nodeteam.site",
+        description: "Production/Live Server"
       }
     ],
     tags: [
@@ -1099,6 +1099,7 @@ function filterSpecToMobile(spec) {
     "/auth/forgot-password/otp": ["post"],
     "/auth/forgot-password/verify-otp": ["post"],
     "/auth/forgot-password/reset": ["post"],
+    "/auth/delete-account": ["delete"],
     "/painters": ["get"],
     "/painters/{id}": ["get"],
     "/painter-reviews": ["post"],
