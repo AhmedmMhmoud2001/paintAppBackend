@@ -28,6 +28,15 @@ const CATALOG_SECTIONS = [
   { name: "أدوات دهان", slug: "tools", description: "rollers وفراشي وملحقات" },
 ];
 
+const categorySeedImage = (slug) =>
+  `https://picsum.photos/seed/paintapp-cat-${encodeURIComponent(slug)}/512/512`;
+
+const bannerSeedImage = (i) =>
+  `https://picsum.photos/seed/paintapp-banner-${String(i)}/1600/500`;
+
+const userAvatar = (seed) =>
+  `https://picsum.photos/seed/paintapp-avatar-${encodeURIComponent(seed)}/512/512`;
+
 /** @typedef {{ name: string; email: string; phone: string; role: import("@prisma/client").user_role }} UserSeed */
 
 const EXTRA_USERS = [
@@ -50,6 +59,120 @@ async function ensureUserIsActiveColumn() {
   } catch (_) {}
 }
 
+async function ensureCategoryImageColumn() {
+  try {
+    await prisma.$executeRawUnsafe(
+      "ALTER TABLE `category` ADD COLUMN `imageUrl` VARCHAR(512) NULL",
+    );
+  } catch (_) {}
+  try {
+    await prisma.$executeRawUnsafe(
+      "UPDATE `category` SET `imageUrl` = NULL WHERE `imageUrl` = ''",
+    );
+  } catch (_) {}
+}
+
+async function ensureBannersTable() {
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS \`banner\` (
+        \`id\` VARCHAR(191) NOT NULL,
+        \`imageUrl\` VARCHAR(512) NOT NULL,
+        \`createdAt\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (\`id\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch (_) {}
+}
+
+async function seedBanners() {
+  await ensureBannersTable();
+  let existing = [];
+  try {
+    existing = await prisma.$queryRawUnsafe("SELECT COUNT(*) AS c FROM `banner`");
+  } catch (_) {
+    existing = [];
+  }
+  const count =
+    Array.isArray(existing) && existing[0]
+      ? Number(existing[0].c ?? existing[0].C ?? 0)
+      : 0;
+  if (count > 0) {
+    console.log(`   بنرات البذرة موجودة مسبقاً (${count}) — تخطّي.`);
+    return;
+  }
+  for (let i = 1; i <= 3; i++) {
+    const id = `seed-banner-${i}`;
+    await prisma.$executeRawUnsafe(
+      "INSERT INTO `banner` (`id`,`imageUrl`) VALUES (?, ?)",
+      id,
+      bannerSeedImage(i),
+    );
+  }
+  console.log("   أُضيفت 3 بنرات تجريبية (بدون imageUrl = null).");
+}
+
+async function backfillBannerImages() {
+  await ensureBannersTable();
+  let rows = [];
+  try {
+    rows = await prisma.$queryRawUnsafe(
+      "SELECT `id` FROM `banner` WHERE `imageUrl` IS NULL OR `imageUrl` = ''",
+    );
+  } catch (_) {
+    rows = [];
+  }
+  if (!Array.isArray(rows) || rows.length === 0) {
+    console.log("   صور البنرات: لا توجد قيم null/فارغة — تخطّي.");
+    return;
+  }
+  let i = 1;
+  for (const r of rows) {
+    const id = String(r.id || "");
+    if (!id) continue;
+    const imageUrl = bannerSeedImage(i);
+    i += 1;
+    try {
+      await prisma.$executeRawUnsafe(
+        "UPDATE `banner` SET `imageUrl` = ? WHERE `id` = ?",
+        imageUrl,
+        id,
+      );
+    } catch (_) {}
+  }
+  console.log(`   صور البنرات: تم ملء ${rows.length} بنر بدون صورة.`);
+}
+
+async function backfillCategoryImages() {
+  await ensureCategoryImageColumn();
+  let rows = [];
+  try {
+    rows = await prisma.$queryRawUnsafe(
+      "SELECT `id`,`name` FROM `category` WHERE `imageUrl` IS NULL OR `imageUrl` = ''",
+    );
+  } catch (_) {
+    rows = [];
+  }
+  if (!Array.isArray(rows) || rows.length === 0) {
+    console.log("   صور الأقسام: لا توجد قيم null/فارغة — تخطّي.");
+    return;
+  }
+  for (const r of rows) {
+    const id = String(r.id || "");
+    const name = String(r.name || "");
+    const seed = name.trim() ? name.trim() : id;
+    const imageUrl = `https://picsum.photos/seed/paintapp-cat-fill-${encodeURIComponent(seed)}/512/512`;
+    try {
+      await prisma.$executeRawUnsafe(
+        "UPDATE `category` SET `imageUrl` = ? WHERE `id` = ?",
+        imageUrl,
+        id,
+      );
+    } catch (_) {}
+  }
+  console.log(`   صور الأقسام: تم ملء ${rows.length} قسم بدون صورة.`);
+}
+
 async function upsertUser(email, data) {
   return prisma.user.upsert({
     where: { email },
@@ -58,6 +181,7 @@ async function upsertUser(email, data) {
       phone: data.phone,
       role: data.role,
       password: data.password,
+      ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
     },
     create: {
       name: data.name,
@@ -65,6 +189,7 @@ async function upsertUser(email, data) {
       phone: data.phone,
       role: data.role,
       password: data.password,
+      ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
     },
   });
 }
@@ -174,6 +299,52 @@ async function seedDesignerGallery() {
   }
 }
 
+const PAINTER_GALLERY_SEEDS = [
+  {
+    email: "painter1@paintapp.test",
+    items: [
+      "https://picsum.photos/seed/paintapp-p1-work-1/1200/800",
+      "https://picsum.photos/seed/paintapp-p1-work-2/1200/800",
+      "https://picsum.photos/seed/paintapp-p1-work-3/1200/800",
+      "https://picsum.photos/seed/paintapp-p1-work-4/1200/800",
+    ],
+  },
+  {
+    email: "painter2@paintapp.test",
+    items: [
+      "https://picsum.photos/seed/paintapp-p2-work-1/1200/800",
+      "https://picsum.photos/seed/paintapp-p2-work-2/1200/800",
+      "https://picsum.photos/seed/paintapp-p2-work-3/1200/800",
+      "https://picsum.photos/seed/paintapp-p2-work-4/1200/800",
+    ],
+  },
+];
+
+async function seedPainterGalleries() {
+  for (const block of PAINTER_GALLERY_SEEDS) {
+    const user = await prisma.user.findUnique({ where: { email: block.email } });
+    if (!user) continue;
+    const painter = await prisma.painter.findUnique({ where: { userId: user.id } });
+    if (!painter) continue;
+
+    const existing = await prisma.paintergallery.count({
+      where: { painterId: painter.id },
+    });
+    if (existing > 0) {
+      console.log(`   معرض أعمال الفني موجود مسبقاً (${block.email}) — تخطّي.`);
+      continue;
+    }
+
+    await prisma.paintergallery.createMany({
+      data: block.items.map((imageUrl) => ({
+        painterId: painter.id,
+        imageUrl,
+      })),
+    });
+    console.log(`   أُضيفت ${block.items.length} صورة لمعرض الفني: ${block.email}`);
+  }
+}
+
 /**
  * 5 أقسام × 5 منتجات؛ منتجان فقط نفاد مخزون (أول منتج في أول قسمين).
  * تكرار التشغيل: يُحدَّث المخزون والـ SKU ثابت.
@@ -192,11 +363,29 @@ async function seedCatalogProducts(catalogVendorPlaceholderId) {
 
   for (let si = 0; si < CATALOG_SECTIONS.length; si++) {
     const sec = CATALOG_SECTIONS[si];
-    const category = await prisma.category.upsert({
-      where: { name: sec.name },
-      update: { description: sec.description },
-      create: { name: sec.name, description: sec.description },
-    });
+    const imageUrl = categorySeedImage(sec.slug);
+    let category;
+    try {
+      category = await prisma.category.upsert({
+        where: { name: sec.name },
+        update: { description: sec.description, imageUrl },
+        create: { name: sec.name, description: sec.description, imageUrl },
+      });
+    } catch (_) {
+      await ensureCategoryImageColumn();
+      category = await prisma.category.upsert({
+        where: { name: sec.name },
+        update: { description: sec.description },
+        create: { name: sec.name, description: sec.description },
+      });
+      try {
+        await prisma.$executeRawUnsafe(
+          "UPDATE `category` SET `imageUrl` = ? WHERE `id` = ?",
+          imageUrl,
+          category.id,
+        );
+      } catch (_) {}
+    }
 
     for (let pi = 0; pi < 5; pi++) {
       const sku = `SEED-${sec.slug}-${String(pi + 1).padStart(2, "0")}`;
@@ -206,12 +395,14 @@ async function seedCatalogProducts(catalogVendorPlaceholderId) {
       const stock = isOos ? 0 : 40 + pi * 5;
       const basePrice = 45 + si * 12 + pi * 7;
       const wholesalePrice = Math.round((basePrice * 0.72) * 100) / 100;
+      const image = `https://picsum.photos/seed/${encodeURIComponent(sku)}/900/900`;
 
       const common = {
         name: `${sec.name} — عرض ${pi + 1}`,
         description: `منتج تجريبي للقسم «${sec.name}» (بذرة).`,
         price: basePrice,
         wholesalePrice,
+        image,
         stock,
         inStock: stock > 0,
         isActive: true,
@@ -518,6 +709,7 @@ async function seedDesignerAndPainterRequests() {
 
 async function main() {
   await ensureUserIsActiveColumn();
+  await ensureCategoryImageColumn();
   const adminPass = await bcrypt.hash("Admin@123", 10);
   const userPass = await bcrypt.hash(DEMO_PASSWORD, 10);
 
@@ -526,6 +718,7 @@ async function main() {
     phone: "01000000000",
     role: "admin",
     password: adminPass,
+    avatarUrl: userAvatar("admin@paintapp.com"),
   });
 
   for (const u of EXTRA_USERS) {
@@ -534,6 +727,7 @@ async function main() {
       phone: u.phone,
       role: u.role,
       password: userPass,
+      avatarUrl: userAvatar(u.email),
     });
   }
 
@@ -543,6 +737,7 @@ async function main() {
       phone: u.phone,
       role: "user",
       password: userPass,
+      avatarUrl: userAvatar(u.email),
     });
   }
 
@@ -680,6 +875,7 @@ async function main() {
   }
 
   await seedDesignerGallery();
+  await seedPainterGalleries();
 
   await seedWholesaleDemoOrders();
 
@@ -694,6 +890,9 @@ async function main() {
   } catch (e) {
     console.warn("⚠ تخطّي كتالوج المنتجات في هذه الجلسة بسبب تعارض schema/client:", e?.message || e);
   }
+  await backfillCategoryImages();
+  await backfillBannerImages();
+  await seedBanners();
   await seedDemoPurchaseOrders();
   await seedDesignerAndPainterRequests();
   await clearSelectionSimulations();

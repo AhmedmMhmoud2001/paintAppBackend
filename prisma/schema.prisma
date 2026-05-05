@@ -38,6 +38,7 @@ model category {
   id          String  @id @default(uuid())
   name        String  @unique(map: "Category_name_key")
   description String?
+  imageUrl    String? @db.VarChar(512)
   /// عرض اختياري يطبّق على كل منتجات القسم (للعرض والمنطق في الواجهة)
   offerId     String?
   offer       offer?  @relation(fields: [offerId], references: [id], onDelete: SetNull, onUpdate: Cascade)

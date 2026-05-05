@@ -57,6 +57,7 @@ import {
   approveVendor,
   getCategories,
   createCategory,
+  uploadCategoryImage,
   updateCategory,
   deleteCategory,
   getOffers,
@@ -728,6 +729,24 @@ const server = http.createServer(async (req, res) => {
     return getCategories(req, res);
   if ((pathname === "/categories" || pathname === "/api/categories") && method === "POST")
     return createCategory(req, res);
+  if (
+    (pathname.startsWith("/categories/") || pathname.startsWith("/api/categories/")) &&
+    (method === "POST" || method === "PATCH")
+  ) {
+    const parts = pathname.split("/").filter(Boolean);
+    const base = parts[0] === "api" ? 1 : 0;
+    const id = parts[base + 1];
+    const sub = parts[base + 2];
+    if (id && sub === "image") {
+      try {
+        authorize(req, ["admin"]);
+        return upload.single("image")(req, res, () => uploadCategoryImage(req, res, id));
+      } catch (err) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ error: err.message }));
+      }
+    }
+  }
   if (
     (pathname.startsWith("/categories/") || pathname.startsWith("/api/categories/")) &&
     method === "PUT"

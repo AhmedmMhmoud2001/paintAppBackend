@@ -1963,14 +1963,28 @@ export const getCategories = async (req, res) => {
       try {
         try {
           const raw = await prisma.$queryRawUnsafe(
-            "SELECT `id`, `name`, `nameAr`, `nameEn`, `description`, `offerId` FROM `category` ORDER BY `name` ASC"
+            "SELECT `id`, `name`, `nameAr`, `nameEn`, `description`, `offerId`, `imageUrl` FROM `category` ORDER BY `name` ASC"
           );
           rows = Array.isArray(raw) ? raw.map((r) => ({ ...r, offer: null })) : [];
         } catch (_) {
-          const raw = await prisma.$queryRawUnsafe(
-            "SELECT `id`, `name`, `description` FROM `category` ORDER BY `name` ASC"
-          );
-          rows = Array.isArray(raw) ? raw.map((r) => ({ ...r, offerId: null, offer: null })) : [];
+          try {
+            const raw = await prisma.$queryRawUnsafe(
+              "SELECT `id`, `name`, `nameAr`, `nameEn`, `description`, `offerId` FROM `category` ORDER BY `name` ASC"
+            );
+            rows = Array.isArray(raw) ? raw.map((r) => ({ ...r, offer: null, imageUrl: null })) : [];
+          } catch (_) {
+            try {
+              const raw = await prisma.$queryRawUnsafe(
+                "SELECT `id`, `name`, `description`, `imageUrl` FROM `category` ORDER BY `name` ASC"
+              );
+              rows = Array.isArray(raw) ? raw.map((r) => ({ ...r, offerId: null, offer: null })) : [];
+            } catch (_) {
+              const raw = await prisma.$queryRawUnsafe(
+                "SELECT `id`, `name`, `description` FROM `category` ORDER BY `name` ASC"
+              );
+              rows = Array.isArray(raw) ? raw.map((r) => ({ ...r, offerId: null, offer: null, imageUrl: null })) : [];
+            }
+          }
         }
       } catch (_) {
         rows = [];
@@ -2002,6 +2016,7 @@ export const getCategories = async (req, res) => {
       nameAr: c.nameAr || c.name || c.nameEn || "",
       nameEn: c.nameEn || c.name || c.nameAr || "",
       description: c.description ?? null,
+      imageUrl: toAbsoluteUrl(req, c.imageUrl ?? null),
       offerId: c.offerId ?? null,
       offer: c.offer ?? null,
       _count: { paints: countMap[c.id] || 0 },
@@ -2030,7 +2045,7 @@ export const createCategory = async (req, res) => {
     }
     try {
       const category = await prisma.category.create({
-        data: { name, nameAr, nameEn, description: data.description || null, offerId },
+        data: { name, nameAr, nameEn, description: data.description || null, offerId, imageUrl: data.imageUrl || null },
         include: { offer: true },
       });
       json(res, 201, {
@@ -2044,34 +2059,72 @@ export const createCategory = async (req, res) => {
       const id = randomUUID();
       try {
         await prisma.$executeRawUnsafe(
-          "INSERT INTO `category` (`id`, `name`, `nameAr`, `nameEn`, `description`, `offerId`) VALUES (?, ?, ?, ?, ?, ?)",
+          "INSERT INTO `category` (`id`, `name`, `nameAr`, `nameEn`, `description`, `offerId`, `imageUrl`) VALUES (?, ?, ?, ?, ?, ?, ?)",
           id,
           name,
           nameAr,
           nameEn,
           data.description || null,
-          offerId
+          offerId,
+          data.imageUrl || null
         );
       } catch (_) {
-        await prisma.$executeRawUnsafe(
-          "INSERT INTO `category` (`id`, `name`, `description`, `offerId`) VALUES (?, ?, ?, ?)",
-          id,
-          name,
-          data.description || null,
-          offerId
-        );
+        try {
+          await prisma.$executeRawUnsafe(
+            "INSERT INTO `category` (`id`, `name`, `description`, `offerId`, `imageUrl`) VALUES (?, ?, ?, ?, ?)",
+            id,
+            name,
+            data.description || null,
+            offerId,
+            data.imageUrl || null
+          );
+        } catch (_) {
+          try {
+            await prisma.$executeRawUnsafe(
+              "INSERT INTO `category` (`id`, `name`, `nameAr`, `nameEn`, `description`, `offerId`) VALUES (?, ?, ?, ?, ?, ?)",
+              id,
+              name,
+              nameAr,
+              nameEn,
+              data.description || null,
+              offerId
+            );
+          } catch (_) {
+            await prisma.$executeRawUnsafe(
+              "INSERT INTO `category` (`id`, `name`, `description`, `offerId`) VALUES (?, ?, ?, ?)",
+              id,
+              name,
+              data.description || null,
+              offerId
+            );
+          }
+        }
       }
       let created = [];
       try {
         created = await prisma.$queryRawUnsafe(
-          "SELECT `id`, `name`, `nameAr`, `nameEn`, `description`, `offerId` FROM `category` WHERE `id` = ? LIMIT 1",
+          "SELECT `id`, `name`, `nameAr`, `nameEn`, `description`, `offerId`, `imageUrl` FROM `category` WHERE `id` = ? LIMIT 1",
           id
         );
       } catch (_) {
-        created = await prisma.$queryRawUnsafe(
-          "SELECT `id`, `name`, `description`, `offerId` FROM `category` WHERE `id` = ? LIMIT 1",
-          id
-        );
+        try {
+          created = await prisma.$queryRawUnsafe(
+            "SELECT `id`, `name`, `description`, `offerId`, `imageUrl` FROM `category` WHERE `id` = ? LIMIT 1",
+            id
+          );
+        } catch (_) {
+          try {
+            created = await prisma.$queryRawUnsafe(
+              "SELECT `id`, `name`, `nameAr`, `nameEn`, `description`, `offerId` FROM `category` WHERE `id` = ? LIMIT 1",
+              id
+            );
+          } catch (_) {
+            created = await prisma.$queryRawUnsafe(
+              "SELECT `id`, `name`, `description`, `offerId` FROM `category` WHERE `id` = ? LIMIT 1",
+              id
+            );
+          }
+        }
       }
       const row = Array.isArray(created) && created[0] ? created[0] : { id, name, nameAr, nameEn, description: data.description || null, offerId };
       json(res, 201, { ...row, offer: null, _count: { paints: 0 } });
@@ -2079,6 +2132,53 @@ export const createCategory = async (req, res) => {
     }
   } catch (err) {
     json(res, 500, { error: err.message });
+  }
+};
+
+const ensureCategoryImageColumn = async () => {
+  try {
+    await prisma.$executeRawUnsafe("ALTER TABLE `category` ADD COLUMN `imageUrl` VARCHAR(512) NULL");
+  } catch (_) {}
+};
+
+const toAbsoluteUrl = (req, maybePath) => {
+  if (maybePath == null) return null;
+  const raw = String(maybePath);
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  // only normalize our uploads relative path
+  if (!raw.startsWith("/uploads/")) return raw;
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").trim();
+  if (!host) return raw;
+  const proto = String(req.headers["x-forwarded-proto"] || "").trim() || "http";
+  return `${proto}://${host}${raw}`;
+};
+
+export const uploadCategoryImage = async (req, res, id) => {
+  try {
+    const file = req.file;
+    if (!file) return json(res, 400, { error: "Image file is required" });
+
+    const imageUrl = `/uploads/${file.filename}`;
+
+    try {
+      const updated = await prisma.category.update({
+        where: { id: id },
+        data: { imageUrl },
+      });
+      const next = updated?.imageUrl || imageUrl;
+      return json(res, 200, { success: true, imageUrl: toAbsoluteUrl(req, next) });
+    } catch (_) {
+      await ensureCategoryImageColumn();
+      await prisma.$executeRawUnsafe(
+        "UPDATE `category` SET `imageUrl` = ? WHERE `id` = ?",
+        imageUrl,
+        id
+      );
+      return json(res, 200, { success: true, imageUrl: toAbsoluteUrl(req, imageUrl) });
+    }
+  } catch (err) {
+    return json(res, 500, { error: err.message });
   }
 };
 
@@ -2177,10 +2277,16 @@ export const updateCategory = async (req, res, id) => {
     const nextNameEn = data.name_en ?? data.nameEn;
     const name = data.name_en ?? data.name_ar ?? data.name;
     const hasOfferKey = Object.prototype.hasOwnProperty.call(data, "offerId");
+    const hasImageKey = Object.prototype.hasOwnProperty.call(data, "imageUrl");
     const offerIdPatch = hasOfferKey
       ? data.offerId === null || data.offerId === "" || data.offerId === undefined
         ? null
         : String(data.offerId)
+      : undefined;
+    const imageUrlPatch = hasImageKey
+      ? data.imageUrl === null || data.imageUrl === "" || data.imageUrl === undefined
+        ? null
+        : String(data.imageUrl)
       : undefined;
     const patch = {
       ...(name && { name }),
@@ -2188,6 +2294,7 @@ export const updateCategory = async (req, res, id) => {
       ...(nextNameEn !== undefined && { nameEn: String(nextNameEn).trim() }),
       ...(data.description !== undefined && { description: data.description }),
       ...(offerIdPatch !== undefined && { offerId: offerIdPatch }),
+      ...(imageUrlPatch !== undefined && { imageUrl: imageUrlPatch }),
     };
 
     // أولاً: المسار الطبيعي مع include relation
@@ -2229,6 +2336,10 @@ export const updateCategory = async (req, res, id) => {
           sqlPatches.push("`offerId` = ?");
           params.push(offerIdPatch);
         }
+        if (imageUrlPatch !== undefined) {
+          sqlPatches.push("`imageUrl` = ?");
+          params.push(imageUrlPatch);
+        }
         if (sqlPatches.length > 0) {
           try {
             await prisma.$executeRawUnsafe(
@@ -2251,6 +2362,10 @@ export const updateCategory = async (req, res, id) => {
               legacyPatches.push("`offerId` = ?");
               legacyParams.push(offerIdPatch);
             }
+            if (imageUrlPatch !== undefined) {
+              legacyPatches.push("`imageUrl` = ?");
+              legacyParams.push(imageUrlPatch);
+            }
             if (legacyPatches.length > 0) {
               await prisma.$executeRawUnsafe(
                 `UPDATE \`category\` SET ${legacyPatches.join(", ")} WHERE \`id\` = ?`,
@@ -2262,16 +2377,24 @@ export const updateCategory = async (req, res, id) => {
         }
         try {
           const raw = await prisma.$queryRawUnsafe(
-            "SELECT `id`, `name`, `nameAr`, `nameEn`, `description`, `offerId` FROM `category` WHERE `id` = ? LIMIT 1",
+            "SELECT `id`, `name`, `nameAr`, `nameEn`, `description`, `offerId`, `imageUrl` FROM `category` WHERE `id` = ? LIMIT 1",
             id
           );
           category = Array.isArray(raw) && raw[0] ? { ...raw[0], offer: null } : null;
         } catch (_) {
-          const raw = await prisma.$queryRawUnsafe(
-            "SELECT `id`, `name`, `description`, `offerId` FROM `category` WHERE `id` = ? LIMIT 1",
-            id
-          );
-          category = Array.isArray(raw) && raw[0] ? { ...raw[0], offer: null } : null;
+          try {
+            const raw = await prisma.$queryRawUnsafe(
+              "SELECT `id`, `name`, `description`, `offerId`, `imageUrl` FROM `category` WHERE `id` = ? LIMIT 1",
+              id
+            );
+            category = Array.isArray(raw) && raw[0] ? { ...raw[0], offer: null } : null;
+          } catch (_) {
+            const raw = await prisma.$queryRawUnsafe(
+              "SELECT `id`, `name`, `description`, `offerId` FROM `category` WHERE `id` = ? LIMIT 1",
+              id
+            );
+            category = Array.isArray(raw) && raw[0] ? { ...raw[0], offer: null, imageUrl: null } : null;
+          }
         }
       }
     }
@@ -5270,7 +5393,12 @@ export const getBanners = async (req, res) => {
     const rows = await prisma.$queryRawUnsafe(
       "SELECT id, imageUrl, createdAt FROM `banner` ORDER BY createdAt DESC",
     );
-    json(res, 200, Array.isArray(rows) ? rows : []);
+    const list = Array.isArray(rows) ? rows : [];
+    json(
+      res,
+      200,
+      list.map((b) => ({ ...b, imageUrl: toAbsoluteUrl(req, b?.imageUrl) })),
+    );
   } catch (err) {
     json(res, 500, { error: err.message || "Failed to load banners" });
   }
@@ -5338,7 +5466,7 @@ export const createBanner = async (req, res) => {
       id,
     );
     const banner = Array.isArray(rows) && rows[0] ? rows[0] : { id, imageUrl, createdAt: new Date().toISOString() };
-    json(res, 201, banner);
+    json(res, 201, { ...banner, imageUrl: toAbsoluteUrl(req, banner?.imageUrl) });
   } catch (err) {
     if (req.file?.path) fs.unlink(req.file.path, () => {});
     const msg = err.message || "Failed to create banner";
