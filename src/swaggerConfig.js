@@ -1115,6 +1115,7 @@ function filterSpecToMobile(spec) {
     "/cart/quote": ["post"],
     "/checkout": ["post"],
     "/categories": ["get"],
+    "/categories/{id}/image": ["post"],
     "/offers": ["get"],
     "/coupons": ["get"],
     "/banners": ["get"],

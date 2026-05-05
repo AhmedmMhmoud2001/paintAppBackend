@@ -2184,6 +2184,78 @@ export const uploadCategoryImage = async (req, res, id) => {
 
 /**
  * @swagger
+ * /categories/{id}/image:
+ *   post:
+ *     tags: [Categories]
+ *     summary: رفع صورة للقسم (admin)
+ *     description: "Multipart upload (field name: image). يعيد رابط الصورة."
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [image]
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: تم تحديث صورة القسم
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 imageUrl: { type: string }
+ *       400:
+ *         description: No file uploaded
+ *       401:
+ *         description: Missing/invalid token
+ *       403:
+ *         description: Admins only
+ * /api/categories/{id}/image:
+ *   post:
+ *     tags: [Categories]
+ *     summary: رفع صورة للقسم (admin) — بادئة /api
+ *     description: نفس POST `/categories/{id}/image`.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [image]
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: تم تحديث صورة القسم
+ */
+/**
+ * @swagger
  * /categories/{id}:
  *   put:
  *     tags: [Categories]
